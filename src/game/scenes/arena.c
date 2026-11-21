@@ -444,7 +444,8 @@ static bool arena_advance_team(scene *scene, int winner) {
     const har *winner_har = object_get_userdata(winner_object);
     team->health[winner] = max2(1, winner_har->health);
     team->health[loser] = 0;
-    game_state_get_player(gs, loser)->pilot->har_id = team->roster[loser][team->fighter[loser]];
+    game_state_get_player(gs, loser)->pilot->har_id =
+        game_state_team_base_har(team->roster[loser][team->fighter[loser]]);
     game_state_set_next(gs, scene->id);
     gs->reload_scene = true;
     return true;
@@ -1884,6 +1885,14 @@ int arena_create(scene *scene) {
             return 1;
         }
 
+        if(scene->gs->team.active &&
+           scene->gs->team.roster[i][scene->gs->team.fighter[i]] == TEAM_HAR_SCOUT) {
+            har *fighter = object_get_userdata(obj);
+            fighter->health_max = max2(1, fighter->health_max * 85 / 100);
+            fighter->health = fighter->health_max;
+            fighter->fwd_speed += fighter->fwd_speed / 5;
+            fighter->back_speed += fighter->back_speed / 5;
+        }
         if(scene->gs->team.active && scene->gs->team.health[i] > 0) {
             har *fighter = object_get_userdata(obj);
             fighter->health = min2(fighter->health_max, scene->gs->team.health[i]);
@@ -1990,7 +1999,9 @@ int arena_create(scene *scene) {
     // Set the name and HAR here, as they will remain static during the match. Ping will be dynamically set.
     for(int i = 0; i < 2; i++) {
         local->player_name[i] = create_text_object(str_c(&_player[i]->pilot->name));
-        local->player_har[i] = create_text_object(lang_get(_player[i]->pilot->har_id + 31));
+        local->player_har[i] = create_text_object(
+            scene->gs->team.active ? game_state_team_har_name(scene->gs->team.roster[i][scene->gs->team.fighter[i]]) :
+                                     lang_get(_player[i]->pilot->har_id + 31));
         local->player_ping[i] = create_text_object("0");
     }
 

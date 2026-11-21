@@ -1159,6 +1159,14 @@ void _setup_keyboard(game_state *gs, int player_id, int control_id) {
     game_player_set_selectable(player, 1);
 }
 
+int game_state_team_base_har(int robot) {
+    return robot == TEAM_HAR_SCOUT ? HAR_JAGUAR : robot;
+}
+
+const char *game_state_team_har_name(int robot) {
+    return robot == TEAM_HAR_SCOUT ? "Jaguar Scout" : har_get_name(robot);
+}
+
 void game_state_start_team_arcade_stage(game_state *gs) {
     static const struct {
         int pilot_id;
@@ -1166,7 +1174,7 @@ void game_state_start_team_arcade_stage(game_state *gs) {
         int arena;
     } stages[TEAM_ARCADE_STAGES] = {
         {PILOT_CRYSTAL, {HAR_JAGUAR, HAR_SHADOW, HAR_THORN}, 0},
-        {PILOT_MILANO, {HAR_PYROS, HAR_ELECTRA, HAR_KATANA}, 1},
+        {PILOT_MILANO, {HAR_PYROS, HAR_ELECTRA, TEAM_HAR_SCOUT}, 1},
         {PILOT_SHIRRO, {HAR_SHREDDER, HAR_FLAIL, HAR_GARGOYLE}, 2},
         {PILOT_RAVEN, {HAR_SHADOW, HAR_GARGOYLE, HAR_CHRONOS}, 3},
         {PILOT_KREISSACK, {HAR_KATANA, HAR_CHRONOS, HAR_NOVA}, 0},
@@ -1190,7 +1198,7 @@ void game_state_start_team_arcade_stage(game_state *gs) {
     for(int i = 0; i < 2; i++) {
         team->fighter[i] = 0;
         team->health[i] = 0;
-        game_state_get_player(gs, i)->pilot->har_id = team->roster[i][0];
+        game_state_get_player(gs, i)->pilot->har_id = game_state_team_base_har(team->roster[i][0]);
     }
     gs->arena = stages[stage].arena;
 }

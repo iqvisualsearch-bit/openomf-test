@@ -21,6 +21,8 @@ void game_state_set_pilot_name(game_state *gs, int pilot_id, const char *pilot_n
 
 bool game_state_check_assertion_is_met(rec_assertion *ass, game_state *gs);
 
+int game_state_team_base_har(int robot);
+const char *game_state_team_har_name(int robot);
 void game_state_start_team_arcade_stage(game_state *gs);
 void game_state_match_settings_reset(game_state *gs);
 void game_state_copy_match_settings(game_state *gs, const match_settings *ms);
