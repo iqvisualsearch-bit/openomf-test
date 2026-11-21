@@ -662,7 +662,7 @@ void handle_action(scene *scene, int player, int action) {
                             player2->pilot->har_id = CURSOR_INDEX(local, 1);
                         }
                         player2->pilot->pilot_id = local->pilot_id_b + (local->pilot_id_b >= STOCK_PILOTS);
-                    } else {
+                    } else if(!scene->gs->team.arcade) {
                         if(player1->sp_wins == (2046 ^ (2 << player1->pilot->pilot_id))) {
                             // everyone but kreissack
                             player2->pilot->pilot_id = PILOT_KREISSACK;
@@ -686,24 +686,34 @@ void handle_action(scene *scene, int player, int action) {
                     }
                     if(!local->network_game) {
                         str_set_c(&player1->pilot->name, selection_pilot_name(local, local->pilot_id_a));
-                        const char *opponent = player2->selectable ? selection_pilot_name(local, local->pilot_id_b) :
-                                                                    lang_get(player2->pilot->pilot_id + 20);
-                        str_set_c(&player2->pilot->name, opponent);
+                        if(!scene->gs->team.arcade) {
+                            const char *opponent = player2->selectable ? selection_pilot_name(local, local->pilot_id_b) :
+                                                                        lang_get(player2->pilot->pilot_id + 20);
+                            str_set_c(&player2->pilot->name, opponent);
+                        }
                     }
                     team_battle *team = &scene->gs->team;
                     if(team->active) {
                         team->roster[0][team->picks] = player1->pilot->har_id;
-                        team->roster[1][team->picks] = player2->pilot->har_id;
+                        if(!team->arcade) {
+                            team->roster[1][team->picks] = player2->pilot->har_id;
+                        }
                         team->picks++;
                         if(team->picks < TEAM_BATTLE_SIZE) {
                             char label[32];
                             snprintf(label, sizeof(label), "Pick robot %u of %d", team->picks + 1, TEAM_BATTLE_SIZE);
                             text_set_from_c(local->wins[0], label);
-                            text_set_from_c(local->wins[1], label);
+                            if(player2->selectable) {
+                                text_set_from_c(local->wins[1], label);
+                            }
                             break;
                         }
                         player1->pilot->har_id = team->roster[0][0];
-                        player2->pilot->har_id = team->roster[1][0];
+                        if(team->arcade) {
+                            game_state_start_team_arcade_stage(scene->gs);
+                        } else {
+                            player2->pilot->har_id = team->roster[1][0];
+                        }
                     }
                     game_state_set_next(scene->gs, SCENE_VS);
                 }
@@ -907,7 +917,7 @@ static void render_pilot_select(melee_local *local, bool player2_is_selectable) 
                                                   local->extra_portraits[i - STOCK_PILOTS].data;
             video_draw_size(face, x, y, 50, 26);
         }
-        for(int player = 0; player < 2; player++) {
+        for(int player = 0; player < (player2_is_selectable ? 2 : 1); player++) {
             int selected = CURSOR_INDEX(local, player);
             if(selected < STOCK_PILOTS) {
                 object_render(player == 0 ? &local->big_portrait_1 : &local->big_portrait_2);
@@ -985,7 +995,10 @@ void melee_render(scene *scene) {
         render_har_select(local, player2->selectable);
     }
 
-    if(player2->selectable) {
+    if(scene->gs->team.arcade && local->page == HAR_SELECT) {
+        text_draw(local->wins[0], 8, 107);
+    }
+    if(player2->selectable && (!scene->gs->team.active || local->page == HAR_SELECT)) {
         text_draw(local->wins[0], 8, 107);
         text_draw(local->wins[1], 160, 107);
     }
@@ -1176,6 +1189,10 @@ int melee_create(scene *scene) {
     object_set_animation(&local->big_portrait_1, pilot_big_portraits);
     object_select_sprite(&local->big_portrait_1, 0);
 
+    if(scene->gs->team.arcade) {
+        local->wins[0] = create_black_text(152, 6, "Pick robot 1 of 3");
+        text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
+    }
     if(player2->selectable) {
         chr_score *s1 = game_player_get_score(game_state_get_player(scene->gs, 0));
         chr_score *s2 = game_player_get_score(game_state_get_player(scene->gs, 1));

@@ -55,10 +55,12 @@ typedef struct {
     bool sim;
 } match_settings;
 
-enum { TEAM_BATTLE_SIZE = 3 };
+enum { TEAM_BATTLE_SIZE = 3, TEAM_ARCADE_STAGES = 5 };
 
 typedef struct {
     bool active;
+    bool arcade;
+    unsigned int stage;
     unsigned int picks;
     uint8_t roster[2][TEAM_BATTLE_SIZE];
     unsigned int fighter[2];

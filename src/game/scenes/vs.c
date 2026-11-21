@@ -269,7 +269,7 @@ void vs_input_tick(scene *scene) {
                 dialog_event(&local->too_pathetic_dialog, i->event_data.action, i->source);
             } else if(dialog_is_visible(&local->quit_dialog)) {
                 dialog_event(&local->quit_dialog, i->event_data.action, i->source);
-            } else if(vs_is_singleplayer(scene) && player1->sp_wins != 0 && !player1->chr) {
+            } else if(!scene->gs->team.active && vs_is_singleplayer(scene) && player1->sp_wins != 0 && !player1->chr) {
                 // there's an active singleplayer campaign, confirm quitting
                 dialog_show(&local->quit_dialog, 1);
             } else {
@@ -468,7 +468,7 @@ static void vs_render(scene *scene) {
         if(scene->gs->fight_stats.winner >= 0) {
             vs_render_fight_stats(scene);
         }
-    } else {
+    } else if(!scene->gs->team.arcade) {
         // 1 player mode insults
         text_draw(local->insults[0], 77, 150);
         text_draw(local->insults[1], 110, 170);
@@ -566,7 +566,12 @@ int vs_create(scene *scene) {
         player1->pilot->har_trades = new_trades;
     } else {
         char title[128];
-        snprintf(title, 128, "%s VS. %s", str_c(&player1->pilot->name), str_c(&player2->pilot->name));
+        if(scene->gs->team.arcade) {
+            snprintf(title, sizeof(title), "STAGE %u/%d: %s VS. %s", scene->gs->team.stage + 1, TEAM_ARCADE_STAGES,
+                     str_c(&player1->pilot->name), str_c(&player2->pilot->name));
+        } else {
+            snprintf(title, sizeof(title), "%s VS. %s", str_c(&player1->pilot->name), str_c(&player2->pilot->name));
+        }
         local->vs_text = create_vs_text(title);
     }
 
@@ -811,7 +816,8 @@ int vs_create(scene *scene) {
     local->too_pathetic_dialog.userdata = scene;
     local->too_pathetic_dialog.clicked = vs_too_pathetic_dialog_clicked;
 
-    if(player2->pilot && player2->pilot->pilot_id == PILOT_KREISSACK && settings_get()->gameplay.difficulty < 2) {
+    if(!scene->gs->team.arcade && player2->pilot && player2->pilot->pilot_id == PILOT_KREISSACK &&
+       settings_get()->gameplay.difficulty < 2) {
         // kreissack, but not on Veteran or higher
         dialog_show(&local->too_pathetic_dialog, 1);
     }

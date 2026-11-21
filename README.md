@@ -48,6 +48,13 @@ losing side sends in its next robot at full health. The winning robot
 carries its remaining health into the next bout. The match ends when
 one side runs out of robots.
 
+### Team Arcade
+
+Choose **Team Arcade** on the main menu for a single-player campaign.
+Pick one pilot and three robots, then defeat five CPU teams, ending with
+Kreissack. A surviving robot carries its health within a stage. Your
+full lineup is restored at the start of the next stage.
+
 ### HD remaster artwork
 
 Desktop builds from this fork include the HD remaster in `mods/hd-remaster.zip`. The game loads the ZIP automatically when mod and PNG support are enabled. It replaces the intro logos, two versus portraits, four tournament player portraits, and the arena announcements and round numbers. To use it with an existing compatible OpenOMF installation, copy the ZIP into the game's `mods` directory alongside `resources` and leave it zipped.

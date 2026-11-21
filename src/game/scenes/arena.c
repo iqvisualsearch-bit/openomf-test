@@ -429,7 +429,13 @@ static bool arena_advance_team(scene *scene, int winner) {
     int loser = 1 - winner;
     team->fighter[loser]++;
     if(team->fighter[loser] == TEAM_BATTLE_SIZE) {
-        game_state_set_next(gs, SCENE_MENU);
+        if(team->arcade && winner == 0 && team->stage + 1 < TEAM_ARCADE_STAGES) {
+            team->stage++;
+            game_state_start_team_arcade_stage(gs);
+            game_state_set_next(gs, SCENE_VS);
+        } else {
+            game_state_set_next(gs, SCENE_MENU);
+        }
         return true;
     }
 
@@ -771,7 +777,7 @@ void arena_har_defeat_hook(int loser_player_id, scene *scene) {
         }
         local->over = 1;
         local->winner = winner_player_id;
-        if(is_singleplayer(gs)) {
+        if(is_singleplayer(gs) && !gs->team.active) {
             player_winner->sp_wins |= 2 << player_loser->pilot->pilot_id;
             if(player_loser->pilot->pilot_id == PILOT_KREISSACK && player_loser->pilot->har_id == HAR_NOVA) {
                 har *loser_har = object_get_userdata(loser);
@@ -1762,6 +1768,9 @@ bool arena_secret_activated(const scene *scene) {
 }
 
 int arena_create(scene *scene) {
+    if(scene->gs->team.arcade) {
+        _setup_ai(scene->gs, 1);
+    }
     // Free up the script cache here, since we know that we don't share animations over the arena start.
     script_cache_clear();
 

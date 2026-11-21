@@ -1159,6 +1159,42 @@ void _setup_keyboard(game_state *gs, int player_id, int control_id) {
     game_player_set_selectable(player, 1);
 }
 
+void game_state_start_team_arcade_stage(game_state *gs) {
+    static const struct {
+        int pilot_id;
+        uint8_t robots[TEAM_BATTLE_SIZE];
+        int arena;
+    } stages[TEAM_ARCADE_STAGES] = {
+        {PILOT_CRYSTAL, {HAR_JAGUAR, HAR_SHADOW, HAR_THORN}, 0},
+        {PILOT_MILANO, {HAR_PYROS, HAR_ELECTRA, HAR_KATANA}, 1},
+        {PILOT_SHIRRO, {HAR_SHREDDER, HAR_FLAIL, HAR_GARGOYLE}, 2},
+        {PILOT_RAVEN, {HAR_SHADOW, HAR_GARGOYLE, HAR_CHRONOS}, 3},
+        {PILOT_KREISSACK, {HAR_KATANA, HAR_CHRONOS, HAR_NOVA}, 0},
+    };
+
+    team_battle *team = &gs->team;
+    unsigned int stage = team->stage;
+    sd_pilot *cpu = game_state_get_player(gs, 1)->pilot;
+    pilot info;
+    pilot_get_info(&info, stages[stage].pilot_id);
+    cpu->pilot_id = stages[stage].pilot_id;
+    cpu->power = info.power;
+    cpu->agility = info.agility;
+    cpu->endurance_level = info.endurance_level;
+    cpu->sex = info.sex;
+    str_set_c(&cpu->name, lang_get(20 + cpu->pilot_id));
+    sd_pilot_set_player_color(cpu, PRIMARY, info.color_1);
+    sd_pilot_set_player_color(cpu, SECONDARY, info.color_2);
+    sd_pilot_set_player_color(cpu, TERTIARY, info.color_3);
+    memcpy(team->roster[1], stages[stage].robots, sizeof(team->roster[1]));
+    for(int i = 0; i < 2; i++) {
+        team->fighter[i] = 0;
+        team->health[i] = 0;
+        game_state_get_player(gs, i)->pilot->har_id = team->roster[i][0];
+    }
+    gs->arena = stages[stage].arena;
+}
+
 void _setup_ai(game_state *gs, int player_id) {
     controller *ctrl = omf_calloc(1, sizeof(controller));
     game_player *player = game_state_get_player(gs, player_id);

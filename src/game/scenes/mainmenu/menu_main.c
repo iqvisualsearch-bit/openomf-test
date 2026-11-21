@@ -78,6 +78,12 @@ static void mainmenu_team_battle(component *c, void *userdata) {
     s->gs->team = (team_battle){.active = true};
 }
 
+static void mainmenu_team_arcade(component *c, void *userdata) {
+    mainmenu_1v1(c, userdata);
+    scene *s = userdata;
+    s->gs->team = (team_battle){.active = true, .arcade = true};
+}
+
 void mainmenu_demo(component *c, void *userdata) {
     scene *s = userdata;
 
@@ -128,6 +134,7 @@ component *menu_main_create(scene *s) {
     menu_attach(menu, button_create("ONE PLAYER GAME", NULL, false, false, mainmenu_1v1, s));
     menu_attach(menu, button_create("TWO PLAYER GAME", NULL, false, false, mainmenu_1v2, s));
     menu_attach(menu, button_create("TEAM BATTLE", NULL, false, false, mainmenu_team_battle, s));
+    menu_attach(menu, button_create("TEAM ARCADE", NULL, false, false, mainmenu_team_arcade, s));
     menu_attach(menu, button_create("TOURNAMENT PLAY", NULL, false, false, mainmenu_mechlab, s));
     component *net = button_create("NETWORK PLAY", NULL, false, false, mainmenu_enter_network, s);
     component_set_id(net, NETWORK_BUTTON_ID);
