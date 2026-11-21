@@ -55,7 +55,19 @@ typedef struct {
     bool sim;
 } match_settings;
 
+enum { TEAM_BATTLE_SIZE = 3 };
+
+typedef struct {
+    bool active;
+    unsigned int picks;
+    uint8_t roster[2][TEAM_BATTLE_SIZE];
+    unsigned int fighter[2];
+    int16_t health[2];
+} team_battle;
+
 typedef struct game_state_t {
+    team_battle team;
+    bool reload_scene;
     unsigned int run;
     unsigned int paused;
     unsigned int this_id;

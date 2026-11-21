@@ -40,6 +40,14 @@ Installation
 2. Extract `OpenOMF.app` and try to open it
 3. If macOS blocks the app, open **System Settings > Privacy & Security**, scroll to the Security section, and click **Open Anyway**
 
+### Local Team Battle
+
+Choose **Team Battle** on the main menu. Each player selects one pilot and
+three distinct robots in the order they will fight. After each bout the
+losing side sends in its next robot at full health. The winning robot
+carries its remaining health into the next bout. The match ends when
+one side runs out of robots.
+
 ### HD remaster artwork
 
 Desktop builds from this fork include the HD remaster in `mods/hd-remaster.zip`. The game loads the ZIP automatically when mod and PNG support are enabled. It replaces the intro logos, two versus portraits, four tournament player portraits, and the arena announcements and round numbers. To use it with an existing compatible OpenOMF installation, copy the ZIP into the game's `mods` directory alongside `resources` and leave it zipped.

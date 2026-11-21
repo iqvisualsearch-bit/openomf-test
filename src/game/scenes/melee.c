@@ -359,6 +359,9 @@ static void load_pilot_colors(scene *scene, int player_id) {
 }
 
 void handle_action(scene *scene, int player, int action) {
+    if(scene->gs->team.active && scene->gs->team.picks == TEAM_BATTLE_SIZE) {
+        return;
+    }
     game_player *player1 = game_state_get_player(scene->gs, 0);
     game_player *player2 = game_state_get_player(scene->gs, 1);
     melee_local *local = scene_get_userdata(scene);
@@ -474,6 +477,19 @@ void handle_action(scene *scene, int player, int action) {
             }
             // FALLTHRU
         case ACT_PUNCH:
+            if(local->page == HAR_SELECT && scene->gs->team.active) {
+                team_battle *team = &scene->gs->team;
+                int robot = CURSOR_INDEX(local, player);
+                if(CURSOR_NOVA_SELECT(local, player) && local->katana_down_count[player] >= 11 &&
+                   !memchr(local->cheat_selected[player], 0, sizeof(local->cheat_selected[player]))) {
+                    robot = HAR_NOVA;
+                }
+                for(unsigned int i = 0; i < team->picks; i++) {
+                    if(team->roster[player][i] == robot) {
+                        return;
+                    }
+                }
+            }
             *done = 1;
             audio_play_sound_simple(20, 0);
             if(CURSOR_A_DONE(local) && (CURSOR_B_DONE(local) || !player2->selectable)) {
@@ -540,6 +556,21 @@ void handle_action(scene *scene, int player, int action) {
                     if(!local->network_game) {
                         str_set_c(&player1->pilot->name, lang_get(player1->pilot->pilot_id + 20));
                         str_set_c(&player2->pilot->name, lang_get(player2->pilot->pilot_id + 20));
+                    }
+                    team_battle *team = &scene->gs->team;
+                    if(team->active) {
+                        team->roster[0][team->picks] = player1->pilot->har_id;
+                        team->roster[1][team->picks] = player2->pilot->har_id;
+                        team->picks++;
+                        if(team->picks < TEAM_BATTLE_SIZE) {
+                            char label[32];
+                            snprintf(label, sizeof(label), "Pick robot %u of %d", team->picks + 1, TEAM_BATTLE_SIZE);
+                            text_set_from_c(local->wins[0], label);
+                            text_set_from_c(local->wins[1], label);
+                            break;
+                        }
+                        player1->pilot->har_id = team->roster[0][0];
+                        player2->pilot->har_id = team->roster[1][0];
                     }
                     game_state_set_next(scene->gs, SCENE_VS);
                 }
@@ -628,7 +659,9 @@ void melee_input_tick(scene *scene) {
     for(i = menu_ev; i; i = i->next) {
         if(i->type == EVENT_TYPE_ACTION && i->event_data.action == ACT_ESC) {
             audio_play_sound_simple(20, 0);
-            if(local->page == HAR_SELECT) {
+            if(scene->gs->team.active) {
+                game_state_set_next(scene->gs, SCENE_MENU);
+            } else if(local->page == HAR_SELECT) {
                 // restore the player selection
                 restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b);
                 local->page = PILOT_SELECT;
@@ -978,10 +1011,16 @@ int melee_create(scene *scene) {
         chr_score *s2 = game_player_get_score(game_state_get_player(scene->gs, 1));
 
         char tmp[64];
-        snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
+        if(scene->gs->team.active) {
+            snprintf(tmp, sizeof(tmp), "Pick robot 1 of %d", TEAM_BATTLE_SIZE);
+        } else {
+            snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
+        }
         local->wins[0] = create_black_text(160 - 8, 6, tmp);
         text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
-        snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
+        if(!scene->gs->team.active) {
+            snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
+        }
         local->wins[1] = create_black_text(160 - 8, 6, tmp);
         text_set_horizontal_align(local->wins[1], TEXT_ALIGN_RIGHT);
 

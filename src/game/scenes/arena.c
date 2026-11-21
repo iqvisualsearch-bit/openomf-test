@@ -416,6 +416,34 @@ static void arena_end(scene *sc) {
     }
 }
 
+static bool arena_advance_team(scene *scene, int winner) {
+    game_state *gs = scene->gs;
+    team_battle *team = &gs->team;
+    if(!team->active) {
+        return false;
+    }
+    if(gs->next_wait_ticks > 0) {
+        return true;
+    }
+
+    int loser = 1 - winner;
+    team->fighter[loser]++;
+    if(team->fighter[loser] == TEAM_BATTLE_SIZE) {
+        game_state_set_next(gs, SCENE_MENU);
+        return true;
+    }
+
+    game_player *winning_player = game_state_get_player(gs, winner);
+    object *winner_object = game_state_find_object(gs, game_player_get_har_obj_id(winning_player));
+    const har *winner_har = object_get_userdata(winner_object);
+    team->health[winner] = max2(1, winner_har->health);
+    team->health[loser] = 0;
+    game_state_get_player(gs, loser)->pilot->har_id = team->roster[loser][team->fighter[loser]];
+    game_state_set_next(gs, scene->id);
+    gs->reload_scene = true;
+    return true;
+}
+
 static void arena_create_roundstart_anim(scene *scene) {
     arena_local *local = scene_get_userdata(scene);
 
@@ -1341,7 +1369,9 @@ void arena_dynamic_tick(scene *scene, int paused) {
                 int progress = local->state_ticks - target_end_ticks;
                 if(progress >= ARENA_CROSSFADE_TICKS) {
                     if(local->over) {
-                        arena_end(scene);
+                        if(!arena_advance_team(scene, local->winner)) {
+                            arena_end(scene);
+                        }
                     } else {
                         local->round++;
                         arena_reset(scene);
@@ -1663,7 +1693,7 @@ static void arena_free(scene *scene) {
             sd_rec_finish(scene->gs->rec, scene->gs->tick);
         }
 
-        if(scene->gs->init_flags->record == 1) {
+        if(scene->gs->init_flags->record == 1 && !scene->gs->team.active) {
             // we're supposed to save it
             sd_rec_save(scene->gs->rec, &scene->gs->init_flags->rec_file);
         }
@@ -1788,6 +1818,9 @@ int arena_create(scene *scene) {
             break;
     }
 
+    if(scene->gs->team.active) {
+        local->rounds = 1;
+    }
     local->tournament = false;
     local->over = 0;
     local->winner = 0;
@@ -1840,6 +1873,11 @@ int arena_create(scene *scene) {
         object_create(obj, scene->gs, pos[i], vec2f_create(0, 0));
         if(har_create(obj, scene->af_data[i], dir[i], player->pilot->har_id, player->pilot->pilot_id, i)) {
             return 1;
+        }
+
+        if(scene->gs->team.active && scene->gs->team.health[i] > 0) {
+            har *fighter = object_get_userdata(obj);
+            fighter->health = min2(fighter->health_max, scene->gs->team.health[i]);
         }
 
         // Enable HAR positional lighting if on Stadium arena (It's not used anywhere else).
