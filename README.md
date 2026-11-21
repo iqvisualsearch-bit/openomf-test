@@ -40,6 +40,16 @@ Installation
 2. Extract `OpenOMF.app` and try to open it
 3. If macOS blocks the app, open **System Settings > Privacy & Security**, scroll to the Security section, and click **Open Anyway**
 
+### HD remaster artwork
+
+Desktop builds from this fork include the HD remaster in `mods/hd-remaster.zip`. The game loads the ZIP automatically when mod and PNG support are enabled. It replaces the intro logos, two versus portraits, four tournament player portraits, and the arena announcements and round numbers. To use it with an existing compatible OpenOMF installation, copy the ZIP into the game's `mods` directory alongside `resources` and leave it zipped.
+
+The artwork comes from [openomf-hdremaster-mod at 62ef1ef](https://github.com/omf2097/openomf-hdremaster-mod/tree/62ef1efcc424c4cba5214f0f9ccf9d0e9f9ecada). To regenerate the bundled ZIP from that checkout, use Python 3 with Pillow and the original game resources:
+
+```bash
+python3 tools/package_hd_remaster.py /path/to/openomf-hdremaster-mod /path/to/OMF2097 mods/hd-remaster.zip
+```
+
 Build
 -----
 For compiling from sources, please see [BUILD.md](BUILD.md).

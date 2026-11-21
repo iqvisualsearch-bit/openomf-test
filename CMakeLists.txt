@@ -569,6 +569,17 @@ endif()
 # Copy some resources to destination resources directory to ease development setup.
 file(COPY resources/openomf.bk resources/gamecontrollerdb/gamecontrollerdb.txt DESTINATION resources)
 
+if(ENABLE_MODMANAGER AND USE_LIBPNG)
+    set(HD_REMASTER_ZIP "${CMAKE_CURRENT_SOURCE_DIR}/mods/hd-remaster.zip")
+    configure_file("${HD_REMASTER_ZIP}" "mods/hd-remaster.zip" COPYONLY)
+    if(WIN32)
+        set(OPENOMF_MOD_INSTALL_DIR openomf/mods)
+    else()
+        set(OPENOMF_MOD_INSTALL_DIR share/games/openomf/mods)
+    endif()
+    install(FILES "${HD_REMASTER_ZIP}" DESTINATION "${OPENOMF_MOD_INSTALL_DIR}" COMPONENT Data)
+endif()
+
 set(DOC_FILES
     README.md
     LICENSE
