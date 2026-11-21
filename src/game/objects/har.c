@@ -2149,12 +2149,55 @@ bool is_har_idle_air(object *obj) {
     return (obj->cur_animation->id == ANIM_JUMPING) && game_state_hars_are_alive(obj->gs);
 }
 
+// Scout reuses Jaguar's animation slots. Only Scout's arena fighter data
+// receives these changes, so a regular Jaguar can fight it in the same bout.
+enum {
+    SCOUT_TELEPORT = 16,
+    SCOUT_WIND_FRONTAL = 24,
+    SCOUT_DIVE_KICK = 43,
+};
+
+static bool har_is_scout(const object *obj, const har *fighter) {
+    const team_battle *team = &obj->gs->team;
+    return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
+}
+
+static void scout_configure_specials(af *data) {
+    af_move *teleport = af_get_move(data, SCOUT_TELEPORT);
+    if(teleport) {
+        str_set_c(&teleport->move_string, "P412");
+        str_set_c(&teleport->ani.animation_string, "A4-B4-A4");
+        vector_clear(&teleport->ani.collision_coords);
+        teleport->damage = 0;
+        teleport->block_damage = 0;
+        teleport->stun = 0;
+    }
+    af_move *wind = af_get_move(data, SCOUT_WIND_FRONTAL);
+    if(wind) {
+        str_set_c(&wind->move_string, "K632");
+    }
+    af_move *dive = af_get_move(data, SCOUT_DIVE_KICK);
+    if(dive) {
+        str_set_c(&dive->move_string, "K2");
+    }
+}
+
 bool is_move_chain_allowed(object *obj, af_move *move) {
     har *h = object_get_userdata(obj);
 
     bool allowed_in_idle = true;
     if(move->pos_constraints & POS_CANNOT_PERFORM) { // Not allowed to perform this move normally
         allowed_in_idle = false;
+    }
+
+    if(har_is_scout(obj, h)) {
+        if(move->id == SCOUT_DIVE_KICK && (!is_har_idle_air(obj) || h->air_attacked)) {
+            return false;
+        }
+        if((move->id == SCOUT_TELEPORT || move->id == SCOUT_WIND_FRONTAL) &&
+           (!is_har_idle_grounded(obj) || object_is_airborne(obj))) {
+            return false;
+        }
     }
 
     unsigned int len;
@@ -2241,8 +2284,12 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
     af_move *move = NULL;
     size_t len;
 
-    for(int i = ANIM_SCREW + 1; i < 70; i++) {
-        if((move = af_get_move(h->af_data, i))) {
+    static const int scout_specials[] = {SCOUT_TELEPORT, SCOUT_WIND_FRONTAL, SCOUT_DIVE_KICK};
+    const int special_count = har_is_scout(obj, h) ? (int)(sizeof(scout_specials) / sizeof(scout_specials[0])) : 0;
+    // Match the longer Scout commands before stock attacks with a shared prefix.
+    for(int i = ANIM_SCREW + 1 - special_count; i < MAX_AF_MOVES; i++) {
+        int move_id = i <= ANIM_SCREW ? scout_specials[i - (ANIM_SCREW + 1 - special_count)] : i;
+        if((move = af_get_move(h->af_data, move_id))) {
             len = str_size(&move->move_string);
             if((str_at(&move->move_string, 0) == prefix &&
                 (len == 1 || !strncmp(str_c(&move->move_string) + 1, inputs, len - 1))) ||
@@ -2399,7 +2446,21 @@ int har_act(object *obj, int act_type) {
 
         // Set correct animation etc.
         // executing_move = 1 prevents new moves while old one is running.
+        if(har_is_scout(obj, h) && move->id == SCOUT_TELEPORT) {
+            float behind = enemy_obj->pos.x - object_get_direction(enemy_obj) * 30.0f;
+            obj->pos.x = clampf(behind, ARENA_LEFT_WALL, ARENA_RIGHT_WALL);
+            object_set_vel(obj, vec2f_create(0, 0));
+            har_face_enemy(obj, enemy_obj);
+        }
         har_set_ani(obj, move->id, 0);
+        if(har_is_scout(obj, h)) {
+            if(move->id == SCOUT_WIND_FRONTAL) {
+                object_set_vel(obj, vec2f_create(9.0f * object_get_direction(obj), 0));
+            } else if(move->id == SCOUT_DIVE_KICK) {
+                object_set_vel(obj, vec2f_create(3.0f * object_get_direction(obj), 11.0f));
+                h->air_attacked = 1;
+            }
+        }
         // TODO the original will eventually discard inputs, but we don't understand how yet
         // so we simply do nothing for now
         // h->inputs[0] = '\0';
@@ -2977,6 +3038,10 @@ int har_create(object *obj, af *af_data, int dir, int har_id, int pilot_id, int 
                 str_set_c(&move->move_string, "!");
             }
         }
+    }
+
+    if(har_is_scout(obj, local)) {
+        scout_configure_specials(af_data);
     }
 
     // All done

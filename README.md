@@ -59,6 +59,12 @@ Both team modes offer Nova and Jaguar Scout on the third row of robot
 selection. Scout inherits Jaguar's visuals and moves, with 20% faster
 ground movement and 15% less maximum health.
 
+Scout's specials use directions relative to the opponent:
+
+- **Teleport** — quarter-circle back + Punch on the ground.
+- **Wind Frontal** — quarter-circle forward + Kick on the ground.
+- **Dive Kick** — Down + Kick while jumping.
+
 ### HD remaster artwork
 
 Desktop builds from this fork include the HD remaster in `mods/hd-remaster.zip`. The game loads the ZIP automatically when mod and PNG support are enabled. It replaces the intro logos, two versus portraits, four tournament player portraits, and the arena announcements and round numbers. To use it with an existing compatible OpenOMF installation, copy the ZIP into the game's `mods` directory alongside `resources` and leave it zipped.
