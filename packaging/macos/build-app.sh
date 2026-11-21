@@ -53,6 +53,11 @@ cp "$ROOT_DIR/resources/openomf.bk" "$APP_RESOURCE_ROOT/resources/"
 cp "$ROOT_DIR/resources/gamecontrollerdb/gamecontrollerdb.txt" "$APP_RESOURCE_ROOT/resources/"
 cp -R "$ROOT_DIR/shaders/." "$APP_RESOURCE_ROOT/shaders/"
 
+if [[ -f "$BUILD_DIR/mods/hd-remaster.zip" ]]; then
+    mkdir -p "$APP_RESOURCE_ROOT/mods"
+    cp "$BUILD_DIR/mods/hd-remaster.zip" "$APP_RESOURCE_ROOT/mods/"
+fi
+
 find "$BUILD_DIR/resources" -maxdepth 1 -type f \( -name "*.DAT2" -o -name "*.LNG" -o -name "*.LNG2" \) \
     -exec cp {} "$APP_RESOURCE_ROOT/resources/" \;
 
