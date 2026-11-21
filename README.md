@@ -61,8 +61,8 @@ ground movement and 15% less maximum health.
 
 Scout's specials use directions relative to the opponent:
 
-- **Teleport** — quarter-circle back + Punch on the ground.
-- **Wind Frontal** — quarter-circle forward + Kick on the ground.
+- **Teleport Slam** — quarter-circle back + Punch. Teleports behind the opponent and slams standing targets.
+- **Wind Frontal** — quarter-circle forward + Kick. Advances with two spinning kicks that can combo.
 - **Dive Kick** — Down + Kick while jumping.
 
 ### HD remaster artwork

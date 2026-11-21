@@ -1306,6 +1306,19 @@ void har_cornerpush(const object *self, object *enemy, const float distance) {
     }
 }
 
+// Scout reuses Jaguar's animation slots. Only Scout's arena fighter data
+// receives these changes, so a regular Jaguar can fight it in the same bout.
+enum {
+    SCOUT_TELEPORT = 20,
+    SCOUT_WIND_FRONTAL = 24,
+    SCOUT_DIVE_KICK = 43,
+};
+
+static bool har_is_scout(const object *obj, const har *fighter) {
+    const team_battle *team = &obj->gs->team;
+    return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
+}
+
 // function to check if har A is hitting har B. Returns 1 if the har is executing a priority move which
 // would interrupt B. Currently only throws are considered priority.
 int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
@@ -1317,6 +1330,11 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
 
     // Check for collisions by sprite collision points
     af_move *move = af_get_move(a->af_data, obj_a->cur_animation->id);
+
+    if(har_is_scout(obj_a, a) && move->id == SCOUT_TELEPORT &&
+       (b->state != STATE_STANDING || object_is_airborne(obj_b) || object_distance(obj_a, obj_b) > 32)) {
+        return 0;
+    }
 
     if(a->in_stasis_ticks) {
         // frozen HARs can't hit
@@ -2149,32 +2167,20 @@ bool is_har_idle_air(object *obj) {
     return (obj->cur_animation->id == ANIM_JUMPING) && game_state_hars_are_alive(obj->gs);
 }
 
-// Scout reuses Jaguar's animation slots. Only Scout's arena fighter data
-// receives these changes, so a regular Jaguar can fight it in the same bout.
-enum {
-    SCOUT_TELEPORT = 16,
-    SCOUT_WIND_FRONTAL = 24,
-    SCOUT_DIVE_KICK = 43,
-};
-
-static bool har_is_scout(const object *obj, const har *fighter) {
-    const team_battle *team = &obj->gs->team;
-    return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
-}
-
 static void scout_configure_specials(af *data) {
     af_move *teleport = af_get_move(data, SCOUT_TELEPORT);
     if(teleport) {
         str_set_c(&teleport->move_string, "P412");
-        str_set_c(&teleport->ani.animation_string, "A4-B4-A4");
-        vector_clear(&teleport->ani.collision_coords);
-        teleport->damage = 0;
-        teleport->block_damage = 0;
-        teleport->stun = 0;
+        // The teleport closes the distance before Jaguar's throw starts.
+        teleport->successor_id = 0;
     }
     af_move *wind = af_get_move(data, SCOUT_WIND_FRONTAL);
     if(wind) {
         str_set_c(&wind->move_string, "K632");
+        // Each pass through the kick frames opens one hit window.
+        str_set_c(&wind->ani.animation_string,
+                  "sp7sf-22l52s5A1-B2-cpq2C2-q2D2-q2E2-F1-"
+                  "sp7sf-22l52s5B1-cpq3C2-q3D2-q3E3-F3-G3-H3");
     }
     af_move *dive = af_get_move(data, SCOUT_DIVE_KICK);
     if(dive) {
@@ -2227,6 +2233,10 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
                 }
                 break;
             case CAT_CLOSE:
+                if(har_is_scout(obj, h) && move->id == SCOUT_TELEPORT) {
+                    allowed = allowed_in_idle && is_har_idle_grounded(obj);
+                    break;
+                }
                 if(player_frame_isset(obj, TAG_JG) || (is_har_idle_grounded(obj) && allowed_in_idle)) {
                     object *enemy_obj = game_state_find_object(
                         obj->gs, game_player_get_har_obj_id(game_state_get_player(obj->gs, !h->player_id)));
