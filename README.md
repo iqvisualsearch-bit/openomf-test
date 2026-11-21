@@ -55,9 +55,9 @@ Pick one pilot and three robots, then defeat five CPU teams, ending with
 Kreissack. A surviving robot carries its health within a stage. Your
 full lineup is restored at the start of the next stage.
 
-Both team modes offer Nova and Jaguar Scout on the third row of robot
-selection. Scout inherits Jaguar's visuals and moves, with 20% faster
-ground movement and 15% less maximum health.
+Both team modes offer Nova and Scout on the third row of robot selection.
+Scout uses Jaguar's visuals and basic attacks, with 20% faster ground
+movement and 15% less maximum health. Scout has three unique specials.
 
 Scout's specials use directions relative to the opponent:
 

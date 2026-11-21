@@ -1923,6 +1923,11 @@ bool attempt_charge_attack(controller *ctrl, ctrl_event **ev) {
 
     switch(h->id) {
         case HAR_JAGUAR: {
+            if(har_is_scout(o, h)) {
+                int cmds[] = {ACT_DOWN, DOWNFORWARD, FORWARD | ACT_KICK};
+                chain_controller_cmd(ctrl, cmds, N_ELEMENTS(cmds), ev);
+                break;
+            }
             if(enemy_range >= RANGE_MID && roll_pref(a->pilot->ap_special) && diff_scale(a)) {
                 // Shadow Leap : B,D,F+P
                 int cmds[] = {BACK, DOWNBACK};

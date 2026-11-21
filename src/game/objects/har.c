@@ -1314,7 +1314,7 @@ enum {
     SCOUT_DIVE_KICK = 43,
 };
 
-static bool har_is_scout(const object *obj, const har *fighter) {
+bool har_is_scout(const object *obj, const har *fighter) {
     const team_battle *team = &obj->gs->team;
     return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
 }
@@ -2168,6 +2168,17 @@ bool is_har_idle_air(object *obj) {
 }
 
 static void scout_configure_specials(af *data) {
+    // Remove Jaguar's leap variants, overhead throw, cannon, and finishers
+    // from the selectable commands without disturbing shared animation references.
+    static const int inherited_specials[] = {15, 16, 17, 21, 25, 26, 28};
+    for(size_t i = 0; i < sizeof(inherited_specials) / sizeof(inherited_specials[0]); i++) {
+        af_move *move = af_get_move(data, inherited_specials[i]);
+        if(move) {
+            str_set_c(&move->move_string, "!");
+        }
+    }
+
+
     af_move *teleport = af_get_move(data, SCOUT_TELEPORT);
     if(teleport) {
         str_set_c(&teleport->move_string, "P412");
@@ -2197,6 +2208,9 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
     }
 
     if(har_is_scout(obj, h)) {
+        if(str_equal_c(&move->move_string, "!")) {
+            return false;
+        }
         if(move->id == SCOUT_DIVE_KICK && (!is_har_idle_air(obj) || h->air_attacked)) {
             return false;
         }
@@ -2444,7 +2458,10 @@ int har_act(object *obj, int act_type) {
     af_move *move = match_move(obj, truncated_inputs);
 
     if(player_frame_isset(obj, TAG_JN) && player_frame_isset(obj, TAG_CW) && (enemy_har->state == STATE_WALLDAMAGE)) {
-        move = af_get_move(h->af_data, player_frame_get(obj, TAG_JN));
+        af_move *followup = af_get_move(h->af_data, player_frame_get(obj, TAG_JN));
+        if(!har_is_scout(obj, h) || (followup && !str_equal_c(&followup->move_string, "!"))) {
+            move = followup;
+        }
     }
 
     if(move) {

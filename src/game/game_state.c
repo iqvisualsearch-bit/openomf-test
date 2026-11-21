@@ -1164,7 +1164,7 @@ int game_state_team_base_har(int robot) {
 }
 
 const char *game_state_team_har_name(int robot) {
-    return robot == TEAM_HAR_SCOUT ? "Jaguar Scout" : har_get_name(robot);
+    return robot == TEAM_HAR_SCOUT ? "Scout" : har_get_name(robot);
 }
 
 void game_state_start_team_arcade_stage(game_state *gs) {

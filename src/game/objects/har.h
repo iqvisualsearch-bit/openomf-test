@@ -200,6 +200,7 @@ typedef struct har_t {
 void har_install_action_hook(har *h, har_action_hook_cb hook, void *data);
 void har_install_hook(har *h, har_hook_cb hook, void *data);
 void har_bootstrap(object *obj);
+bool har_is_scout(const object *obj, const har *fighter);
 int har_create(object *obj, af *af_data, int dir, int har_id, int pilot_id, int player_id);
 void har_face_enemy(object *obj, object *obj_enemy);
 void har_set_ani(object *obj, int animation_id, int repeat);
