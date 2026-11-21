@@ -349,7 +349,7 @@ static bool pilot_portrait_from_world(sprite *out, const sd_pic_photo *photo, co
     // Preserve transparent index 0 and avoid the slots used for player and cursor colors.
     uint8_t color_map[256] = {0};
     for(int i = 1; i < 256; i++) {
-        vga_color color = source->colors[i];
+        vga_color color = i < 48 ? photo->pal.colors[i] : source->colors[i];
         int best = 3 * 255 * 255 + 1;
         for(int j = 96; j < 246; j++) {
             vga_color candidate = target->colors[j];
@@ -373,33 +373,34 @@ static bool pilot_portrait_from_world(sprite *out, const sd_pic_photo *photo, co
     return true;
 }
 
-static bool load_world_portrait_files(sd_pic_file *pic, sd_bk_file *world) {
+static bool load_world_portrait_files(sd_pic_file *pic, sd_bk_file *portrait_bk) {
     path pic_path = get_resource_filename("WORLD.PIC");
-    path world_path = get_resource_filename("WORLD.BK");
+    // Tournament portraits use the MechLab palette, even for the World tournament.
+    path palette_path = get_resource_filename("MECHLAB.BK");
     sd_pic_create(pic);
-    sd_bk_create(world);
-    return sd_pic_load(pic, &pic_path) == SD_SUCCESS && sd_bk_load(world, &world_path) == SD_SUCCESS &&
-           world->palette_count > 0;
+    sd_bk_create(portrait_bk);
+    return sd_pic_load(pic, &pic_path) == SD_SUCCESS && sd_bk_load(portrait_bk, &palette_path) == SD_SUCCESS &&
+           portrait_bk->palette_count > 0;
 }
 
 bool melee_load_world_portrait(scene *scene, sprite *out, unsigned int photo_id) {
     sd_pic_file pic;
-    sd_bk_file world;
-    bool loaded = load_world_portrait_files(&pic, &world) &&
-                  pilot_portrait_from_world(out, sd_pic_get(&pic, photo_id), world.palettes[0],
+    sd_bk_file portrait_bk;
+    bool loaded = load_world_portrait_files(&pic, &portrait_bk) &&
+                  pilot_portrait_from_world(out, sd_pic_get(&pic, photo_id), portrait_bk.palettes[0],
                                             bk_get_palette(scene->bk_data, 0));
-    sd_bk_free(&world);
+    sd_bk_free(&portrait_bk);
     sd_pic_free(&pic);
     return loaded;
 }
 
 static void load_extra_pilots(scene *scene, melee_local *local) {
     sd_pic_file pic;
-    sd_bk_file world;
+    sd_bk_file portrait_bk;
     sd_tournament_file tournament;
     sd_tournament_create(&tournament);
     path path_to_tournament = get_resource_filename("WORLD.TRN");
-    if(load_world_portrait_files(&pic, &world) && sd_tournament_load(&tournament, &path_to_tournament) == SD_SUCCESS) {
+    if(load_world_portrait_files(&pic, &portrait_bk) && sd_tournament_load(&tournament, &path_to_tournament) == SD_SUCCESS) {
         bool used[MAX_PIC_PHOTOS] = {false};
         for(unsigned int i = 0; i < tournament.enemy_count && local->extra_count < EXTRA_PILOTS; i++) {
             const sd_pilot *pilot = tournament.enemies[i];
@@ -408,7 +409,7 @@ static void load_extra_pilots(scene *scene, melee_local *local) {
             unsigned int slot = local->extra_count;
             if(photo_id >= MAX_PIC_PHOTOS || used[photo_id] || str_size(&pilot->name) == 0 ||
                !pilot_portrait_from_world(&local->extra_portraits[slot], photo,
-                                          world.palettes[0], bk_get_palette(scene->bk_data, 0))) {
+                                          portrait_bk.palettes[0], bk_get_palette(scene->bk_data, 0))) {
                 continue;
             }
             used[photo_id] = true;
@@ -419,7 +420,7 @@ static void load_extra_pilots(scene *scene, melee_local *local) {
         }
         sd_tournament_free(&tournament);
     }
-    sd_bk_free(&world);
+    sd_bk_free(&portrait_bk);
     sd_pic_free(&pic);
 }
 
