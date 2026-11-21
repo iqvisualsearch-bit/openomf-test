@@ -6,6 +6,7 @@
 #include "game/gui/text/text.h"
 #include "game/protos/scene.h"
 #include "game/scenes/mechlab/lab_menu_customize.h"
+#include "game/scenes/melee.h"
 #include "game/utils/formatting.h"
 #include "game/utils/settings.h"
 #include "resources/languages.h"
@@ -272,7 +273,9 @@ void vs_input_tick(scene *scene) {
                 // there's an active singleplayer campaign, confirm quitting
                 dialog_show(&local->quit_dialog, 1);
             } else {
-                if(player1->chr) {
+                if(scene->gs->team.active) {
+                    game_state_set_next(scene->gs, SCENE_MENU);
+                } else if(player1->chr) {
                     // Match cancelled, no winner
                     scene->gs->fight_stats.winner = -1;
                     // null out the  p2 pilot
@@ -497,6 +500,22 @@ void vs_too_pathetic_dialog_clicked(dialog *dlg, dialog_result result) {
     game_state_set_next(sc->gs, SCENE_SCOREBOARD);
 }
 
+static bool vs_set_team_portrait(scene *scene, object *portrait, const sd_pilot *pilot) {
+    if(!scene->gs->team.active || pilot->pilot_id <= PILOT_KREISSACK) {
+        return false;
+    }
+    sprite *face = omf_calloc(1, sizeof(sprite));
+    if(!melee_load_world_portrait(scene, face, pilot->photo_id)) {
+        omf_free(face);
+        return false;
+    }
+    object_set_sprite_override(portrait, 1);
+    object_set_animation(portrait, create_animation_from_single(face, vec2i_create(0, -face->data->h)));
+    object_set_animation_owner(portrait, OWNER_OBJECT);
+    portrait->cur_sprite_id = 0;
+    return true;
+}
+
 int vs_create(scene *scene) {
     // Initialize Demo
     if(is_demoplay(scene->gs)) {
@@ -589,9 +608,10 @@ int vs_create(scene *scene) {
             object_set_animation(player1_portrait, create_animation_from_single(sp, vec2i_create(0, 0)));
             object_set_animation_owner(player1_portrait, OWNER_OBJECT);
             player1_portrait->cur_sprite_id = 0;
-        } else {
+        } else if(!vs_set_team_portrait(scene, player1_portrait, player1->pilot)) {
             object_set_animation(player1_portrait, ani);
-            object_select_sprite(player1_portrait, player1->pilot->pilot_id);
+            int pilot_id = player1->pilot->pilot_id;
+            object_select_sprite(player1_portrait, pilot_id <= PILOT_KREISSACK ? pilot_id : PILOT_CRYSTAL);
         }
         object_set_halt(player1_portrait, 1);
         game_state_add_object(scene->gs, player1_portrait, RENDER_LAYER_TOP, 0, 0);
@@ -605,9 +625,10 @@ int vs_create(scene *scene) {
             object_set_animation(player2_portrait, create_animation_from_single(sp, vec2i_create(0, 0)));
             object_set_animation_owner(player2_portrait, OWNER_OBJECT);
             player2_portrait->cur_sprite_id = 0;
-        } else {
+        } else if(!vs_set_team_portrait(scene, player2_portrait, player2->pilot)) {
             object_set_animation(player2_portrait, ani);
-            object_select_sprite(player2_portrait, player2->pilot->pilot_id);
+            int pilot_id = player2->pilot->pilot_id;
+            object_select_sprite(player2_portrait, pilot_id <= PILOT_KREISSACK ? pilot_id : PILOT_CRYSTAL);
         }
         object_set_direction(player2_portrait, OBJECT_FACE_LEFT);
         object_set_halt(player2_portrait, 1);
@@ -683,7 +704,7 @@ int vs_create(scene *scene) {
         // tournament mode
         local->insults[0] = NULL;
         local->insults[1] = create_insult_text(str_c(&player2->pilot->quotes[0]), 150, 60);
-    } else if(player2->pilot) {
+    } else if(player2->pilot && !scene->gs->team.active) {
         // 1 player
         local->insults[0] =
             create_insult_text(lang_get(749 + (11 * player1->pilot->pilot_id) + player2->pilot->pilot_id), 150, 30);
