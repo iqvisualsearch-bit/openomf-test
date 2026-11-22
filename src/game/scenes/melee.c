@@ -986,9 +986,9 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
                 video_draw_size(&local->har_portraits[i].enabled, x, y, 50, 26);
             } else if(i == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
                 const int player = right && !left ? 1 : 0;
-                video_draw_full(&local->mech_gief_tile, x + 7, y, 36, 19, 0, 0, player * 48,
+                video_draw_full(&local->mech_gief_tile, x + 8, y + 1, 34, 16, 0, 0, player * 48,
                                 (player + 1) * 48, 255, 0, 0);
-                text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 17);
+                text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 16);
             } else {
                 text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 7);
             }
@@ -1120,7 +1120,7 @@ static void load_har_portraits(scene *scene, melee_local *local) {
 
 static void load_hars(scene *scene, melee_local *local, bool player2_is_selectable) {
     if(scene->gs->team.active) {
-        local->mech_gief_preview = scene_create_mech_gief_preview(false);
+        local->mech_gief_preview = scene_create_mech_gief_preview(scene, false);
         if(local->mech_gief_preview) {
             const sprite *pose = animation_get_sprite(local->mech_gief_preview, 0);
             surface_create_from_surface(&local->mech_gief_tile, 80, 44, 28, 12, pose->data);

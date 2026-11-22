@@ -112,7 +112,25 @@ static sprite *scene_create_mech_gief_idle_pose(const surface *base, int dip) {
     return pose;
 }
 
-static sprite *scene_load_mech_gief_pose(const char *resource) {
+static uint8_t scene_match_preview_color(vga_color color, const vga_palette *palette) {
+    // Skip transparency, player colors, and the menu cursor colors.
+    uint8_t match = 96;
+    int best_distance = 3 * 255 * 255 + 1;
+    for(int index = 96; index < 246; index++) {
+        const vga_color candidate = palette->colors[index];
+        const int r = color.r - candidate.r;
+        const int g = color.g - candidate.g;
+        const int b = color.b - candidate.b;
+        const int distance = r * r + g * g + b * b;
+        if(distance < best_distance) {
+            best_distance = distance;
+            match = index;
+        }
+    }
+    return match;
+}
+
+static sprite *scene_load_mech_gief_pose_with_palette(const char *resource, const vga_palette *menu_palette) {
     path filename = get_resource_filename(resource);
     size_t size = 0;
     if(!path_filesize(&filename, &size) || size == 0) {
@@ -121,8 +139,10 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
 
     char *png = omf_malloc(size);
     sd_vga_image image = {0};
+    vga_palette source_palette = {0};
     bool loaded = path_read_file(&filename, png, size) &&
-                  sd_vga_image_from_png_in_memory(&image, (const unsigned char *)png, size, true, NULL) == SD_SUCCESS;
+                  sd_vga_image_from_png_in_memory(&image, (const unsigned char *)png, size, true,
+                                                  menu_palette ? &source_palette : NULL) == SD_SUCCESS;
     omf_free(png);
     if(!loaded || image.w != 144 || image.h != 120) {
         if(image.data) {
@@ -138,15 +158,21 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     // The stock palette reserves 16 shades per armor channel. Leave the
     // darkest outlines, visor highlights, and orange flame effects fixed.
     if(strncmp(resource, "mech-gief-flame-effect-", sizeof("mech-gief-flame-effect-") - 1) != 0) {
-        for(int i = 0; i < pixels->w * pixels->h; i++) {
-            const unsigned char color = pixels->data[i];
+        uint8_t colors[256] = {0};
+        for(int color = 1; color < 256; color++) {
             if(color >= 176 && color <= 182) {
-                pixels->data[i] = PRIMARY * 16 + 2 * (color - 176) + 2;
+                colors[color] = PRIMARY * 16 + 2 * (color - 176) + 2;
             } else if(color >= 210 && color <= 221) {
-                pixels->data[i] = SECONDARY * 16 + color - 208;
+                colors[color] = SECONDARY * 16 + color - 208;
             } else if(color >= 200 && color <= 205) {
-                pixels->data[i] = TERTIARY * 16 + 2 * (color - 200) + 2;
+                colors[color] = TERTIARY * 16 + 2 * (color - 200) + 2;
+            } else {
+                colors[color] = menu_palette ? scene_match_preview_color(source_palette.colors[color], menu_palette)
+                                            : color;
             }
+        }
+        for(int i = 0; i < pixels->w * pixels->h; i++) {
+            pixels->data[i] = colors[pixels->data[i]];
         }
     }
     sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
@@ -155,10 +181,15 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     return pose;
 }
 
-animation *scene_create_mech_gief_preview(bool versus) {
-    sprite *pose = versus ? scene_load_mech_gief_pose("mech-gief-versus.png") : NULL;
+static sprite *scene_load_mech_gief_pose(const char *resource) {
+    return scene_load_mech_gief_pose_with_palette(resource, NULL);
+}
+
+animation *scene_create_mech_gief_preview(scene *sc, bool versus) {
+    const vga_palette *palette = bk_get_palette(sc->bk_data, 0);
+    sprite *pose = versus ? scene_load_mech_gief_pose_with_palette("mech-gief-versus.png", palette) : NULL;
     if(!pose) {
-        pose = scene_load_mech_gief_pose("mech-gief-idle.png");
+        pose = scene_load_mech_gief_pose_with_palette("mech-gief-idle.png", palette);
     }
     if(!pose) {
         return NULL;

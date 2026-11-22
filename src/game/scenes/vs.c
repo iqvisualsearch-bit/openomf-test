@@ -449,13 +449,14 @@ static void vs_set_mech_gief_preview(scene *scene, object *robot, int player) {
         return;
     }
 
-    animation *preview = scene_create_mech_gief_preview(true);
+    animation *preview = scene_create_mech_gief_preview(scene, true);
     if(preview) {
         object_set_animation(robot, preview);
         object_set_animation_owner(robot, OWNER_OBJECT);
         object_select_sprite(robot, 0);
-        object_set_pos(robot, vec2i_create(player == 0 ? 80 : 240, 178));
-        robot->x_percent = robot->y_percent = 1.65f;
+        // Keep the feet above the arena panel at y=150.
+        object_set_pos(robot, vec2i_create(player == 0 ? 80 : 240, 148));
+        robot->x_percent = robot->y_percent = 1.25f;
     }
 }
 

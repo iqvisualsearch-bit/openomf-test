@@ -56,7 +56,7 @@ struct scene_t {
 
 int scene_create(scene *scene, game_state *gs, int scene_id);
 int scene_load_har(scene *scene, int player_id);
-animation *scene_create_mech_gief_preview(bool versus);
+animation *scene_create_mech_gief_preview(scene *sc, bool versus);
 void scene_init(scene *scene);
 void scene_free(scene *scene);
 bool scene_event(scene *scene, SDL_Event *event);
