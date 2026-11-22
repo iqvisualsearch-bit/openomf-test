@@ -1046,7 +1046,13 @@ void har_take_damage(object *obj, af_move *move) {
                   obj->cur_animation->id == ANIM_CROUCHING_BLOCK) {
             reaction_pose = MECH_GIEF_HIT_CROUCHING;
         }
-        animation *reaction = h->throw_duration ? NULL : h->af_data->mech_gief_reactions[reaction_pose];
+        animation *reaction = h->af_data->mech_gief_reactions[reaction_pose];
+        if(h->throw_duration) {
+            // Piledriver's victim script holds frame D before using the shared L/M knockdown frames.
+            reaction = move->next_move == MECH_GIEF_PILEDRIVER
+                           ? h->af_data->mech_gief_reactions[MECH_GIEF_HIT_STANDING]
+                           : NULL;
+        }
         h->state = STATE_RECOIL;
         object_set_animation(obj, reaction ? reaction : &af_get_move(h->af_data, ANIM_DAMAGE)->ani);
         object_set_repeat(obj, 0);
@@ -2875,6 +2881,8 @@ void har_finished(object *obj) {
             // The more negative you go, the more time you're stunned.
             h->endurance = (((h->endurance_max - h->endurance) / 256) * 5 / 2 - 60) * 256;
         }
+        // A grounded dizzy fighter starts a fresh combo, even if a throw or juggle caused the stun.
+        clear_rehits(h);
         h->state = STATE_STUNNED;
         har_set_ani(obj, ANIM_STUNNED, 1);
         har_event_stun(h, ctrl);
