@@ -27,6 +27,7 @@
 
 #define IS_ZERO(n) (n < 0.8 && n > -0.8)
 
+static bool har_is_mech_gief(const object *obj, const har *fighter);
 void har_finished(object *obj);
 int har_act(object *obj, int act_type);
 void har_spawn_scrap(const object *obj, vec2i pos, int amount);
@@ -722,6 +723,21 @@ void har_move(object *obj) {
             har_event_land(h, ctrl);
             har_floor_landing_effects(obj, true);
         } else if(h->state == STATE_JUMPING && enemy_har->is_grabbed == 0 && !player_frame_isset(obj, TAG_CG)) {
+            // A confirmed aerial normal can use a grounded special buffered just before landing.
+            const int landed_move = obj->cur_animation->id;
+            const bool air_confirm = h->hit_confirmed && h->executing_move && har_is_mech_gief(obj, h) &&
+                                     (landed_move == MECH_GIEF_BODY_PRESS || landed_move == MECH_GIEF_DROPKICK);
+            if(air_confirm && (h->punch_valid || h->kick_valid)) {
+                h->state = STATE_STANDING;
+                object_set_vel(obj, vec2f_create(0, 0));
+                if(har_act(obj, ACT_NONE)) {
+                    har_event_land(h, ctrl);
+                    har_floor_landing_effects(obj, true);
+                    return;
+                }
+                h->state = STATE_JUMPING;
+            }
+
             // The custom jump has a short planted landing frame.
             if(h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                 h->state = STATE_STANDING;
@@ -1523,6 +1539,12 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
         object_set_direction(obj_b, -object_get_direction(obj_a));
         har_take_damage(obj_b, move);
 
+        if(move->id == MECH_GIEF_LARIAT && har_is_mech_gief(obj_a, a) && obj_a->q_val < 2 &&
+           !object_is_airborne(obj_b)) {
+            // Hold the first hit close enough for the next revolution.
+            obj_b->vel.x = -2.0f * object_get_direction(obj_b);
+        }
+
         if(b->rehit_combo) {
             obj_b->vel.y -= 3;
         }
@@ -2282,11 +2304,17 @@ static bool har_can_cancel_mech_gief_normal(const object *obj, const har *h, int
                              current == MECH_GIEF_LUNGING_PUNCH || current == MECH_GIEF_LONG_SIDE_KICK ||
                              current == MECH_GIEF_HEEL_SWEEP || current == MECH_GIEF_LOW_UPPERCUT ||
                              current == MECH_GIEF_HAMMERFIST || current == MECH_GIEF_HEEL_STOMP;
-    if(move_id == MECH_GIEF_FLAME_BURST || move_id == MECH_GIEF_GRAB) {
-        const bool available = move_id == MECH_GIEF_FLAME_BURST ? h->af_data->mech_gief_flame_effect != NULL :
-                                                                har_has_piledriver(obj, h);
-        return available && (neutral || directional || current == MECH_GIEF_CROUCH_PUNCH ||
-                             current == MECH_GIEF_CROUCH_KICK);
+    if(move_id == MECH_GIEF_FLAME_BURST || move_id == MECH_GIEF_GRAB || move_id == MECH_GIEF_LARIAT) {
+        if(!har_is_mech_gief(obj, h)) {
+            return false;
+        }
+        if((move_id == MECH_GIEF_FLAME_BURST && !h->af_data->mech_gief_flame_effect) ||
+           (move_id == MECH_GIEF_GRAB && !har_has_piledriver(obj, h))) {
+            return false;
+        }
+        return (neutral || directional || current == MECH_GIEF_CROUCH_PUNCH ||
+                             current == MECH_GIEF_CROUCH_KICK || current == MECH_GIEF_BODY_PRESS ||
+                             current == MECH_GIEF_DROPKICK);
     }
     return neutral &&
            (move_id == MECH_GIEF_TURNING_ELBOW || move_id == MECH_GIEF_HIGH_KICK ||
@@ -2587,6 +2615,17 @@ int har_act(object *obj, int act_type) {
         }
         const bool piledriver_from_normal = move->id == MECH_GIEF_GRAB &&
                                            har_can_cancel_mech_gief_normal(obj, h, move->id);
+        h->piledriver_from_normal = piledriver_from_normal;
+        if(piledriver_from_normal && har_can_grab_normal_hitstun(enemy_obj, h, move)) {
+            // Close a small gap from grounded hit pushback before the grab starts.
+            const float reach = (move->successor_id + 14) * (obj->gs->match_settings.throw_range / 100.0f);
+            const float gap = object_distance(obj, enemy_obj) - reach;
+            if(gap > -8 && gap <= 14) {
+                const int toward = enemy_obj->pos.x > obj->pos.x ? 1 : -1;
+                const float step = min2(gap + 8, 14);
+                obj->pos.x = clampf(obj->pos.x + step * toward, ARENA_LEFT_WALL, ARENA_RIGHT_WALL);
+            }
+        }
         har_set_ani(obj, move->id, 0);
         h->piledriver_from_normal = piledriver_from_normal;
         if(har_is_scout(obj, h)) {

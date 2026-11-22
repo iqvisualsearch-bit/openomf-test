@@ -593,7 +593,7 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     // Attach the effect frames to the mouth. Keep their pixels out of the HAR silhouette.
     for(int i = 4; i < 8; i++) {
         poses[i]->pos.x += 34;
-        poses[i]->pos.y -= 67;
+        poses[i]->pos.y -= 61;
     }
     animation *effect = create_animation_from_single(poses[4], burst->ani.start_pos);
     for(int i = 5; i < 8; i++) {
@@ -602,8 +602,8 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     fighter->mech_gief_flame_effect = effect;
 
     // The full jet and flicker share one hit window.
-    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -76, 102, -58}, 2);
-    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -75, 94, -59}, 3);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -80, 110, -54}, 2);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -79, 106, -55}, 3);
 
     fighter->original_mech_gief_moves[MECH_GIEF_FLAME_BURST_SLOT] = attack;
     animation original_attack = burst->ani;
@@ -613,7 +613,8 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     burst->next_move = 0;
     burst->successor_id = 0;
     burst->damage = 22;
-    str_set_c(&burst->footer_string, "sp13s2l30D1-E2-F4-E2-D2");
+    // Use the same orange palette flash as Pyros and push the opponent back.
+    str_set_c(&burst->footer_string, "vx-11pd240pp55ptp6ptd1ptr40sp13s2l30D1-E2-F6-E3-D3");
 }
 
 static void scene_load_mech_gief_lariat(af *fighter) {
@@ -645,9 +646,9 @@ static void scene_load_mech_gief_lariat(af *fighter) {
         animation_append_sprite(attack, poses[i]);
     }
     attack->id = MECH_GIEF_LARIAT;
-    // Keep the pivot planted. Projectile immunity begins with the spin and
-    // ends when the arms start retracting, with one hit per use.
-    str_set_c(&attack->animation_string, "hA5-hzpcps5l40sp7B3-hzpC3-hzpD3-hzpE3-hF3-hG4-hH5");
+    // Spin twice. The second revolution opens a fresh hit window.
+    str_set_c(&attack->animation_string,
+              "hA5-hzpcps5l40sp7B2-hzpC2-hzpD2-hzpE2-hzpq2cps5l40sp7B2-hzpC2-hzpD2-hzpE2-hF3-hG4-hH5");
 
     scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){-54, -77, 54, -55}, 1);
     scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){-54, -77, 54, -55}, 2);
