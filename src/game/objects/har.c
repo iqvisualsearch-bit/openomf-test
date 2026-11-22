@@ -976,9 +976,9 @@ void har_take_damage(object *obj, af_move *move) {
         apply_stun_damage(obj, stun);
     }
 
-    // Handle health changes
+    // Refill before defeat processing so training keeps the normal hit reaction.
     if(h->health <= 0) {
-        h->health = 0;
+        h->health = obj->gs->team.training ? h->health_max : 0;
     }
 
     if(h->health == 0) {
@@ -1977,6 +1977,9 @@ void har_tick(object *obj) {
         if(h->throw_duration == 0) {
             // we've already called har_take_damage, so just apply the damage and check for defeat
             h->health -= h->last_damage_value;
+            if(obj->gs->team.training && h->health <= 0) {
+                h->health = h->health_max;
+            }
             // cannot combo from throw unless rehit mode is enabled
             h->rehit_combo = true;
             if(h->endurance < 0) {

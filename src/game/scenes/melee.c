@@ -492,7 +492,8 @@ static void load_pilot_colors(scene *scene, int player_id) {
 }
 
 void handle_action(scene *scene, int player, int action) {
-    if(scene->gs->team.active && scene->gs->team.picks == TEAM_BATTLE_SIZE) {
+    unsigned int roster_size = scene->gs->team.training ? 1 : TEAM_BATTLE_SIZE;
+    if(scene->gs->team.active && scene->gs->team.picks == roster_size) {
         return;
     }
     game_player *player1 = game_state_get_player(scene->gs, 0);
@@ -713,7 +714,7 @@ void handle_action(scene *scene, int player, int action) {
                             team->roster[1][team->picks] = player2->pilot->har_id;
                         }
                         team->picks++;
-                        if(team->picks < TEAM_BATTLE_SIZE) {
+                        if(team->picks < roster_size) {
                             char label[32];
                             snprintf(label, sizeof(label), "Pick robot %u of %d", team->picks + 1, TEAM_BATTLE_SIZE);
                             text_set_from_c(local->wins[0], label);
@@ -788,12 +789,15 @@ void melee_input_tick(scene *scene) {
     game_player *player2 = game_state_get_player(scene->gs, 1);
     ctrl_event *p1 = NULL, *p2 = NULL, *i;
     controller_poll(player1->ctrl, &p1);
-    controller_poll(player2->ctrl, &p2);
+    if(!scene->gs->team.training) {
+        controller_poll(player2->ctrl, &p2);
+    }
     i = p1;
     if(i) {
         do {
             if(i->type == EVENT_TYPE_ACTION) {
-                handle_action(scene, 0, i->event_data.action);
+                int side = scene->gs->team.training && CURSOR_A_DONE(local) ? 1 : 0;
+                handle_action(scene, side, i->event_data.action);
             } else if(i->type == EVENT_TYPE_CLOSE) {
                 game_state_set_next(scene->gs, SCENE_MENU);
             }
@@ -1243,14 +1247,18 @@ int melee_create(scene *scene) {
         chr_score *s2 = game_player_get_score(game_state_get_player(scene->gs, 1));
 
         char tmp[64];
-        if(scene->gs->team.active) {
+        if(scene->gs->team.training) {
+            snprintf(tmp, sizeof(tmp), "Your robot");
+        } else if(scene->gs->team.active) {
             snprintf(tmp, sizeof(tmp), "Pick robot 1 of %d", TEAM_BATTLE_SIZE);
         } else {
             snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
         }
         local->wins[0] = create_black_text(160 - 8, 6, tmp);
         text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
-        if(!scene->gs->team.active) {
+        if(scene->gs->team.training) {
+            snprintf(tmp, sizeof(tmp), "Dummy robot");
+        } else if(!scene->gs->team.active) {
             snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
         }
         local->wins[1] = create_black_text(160 - 8, 6, tmp);

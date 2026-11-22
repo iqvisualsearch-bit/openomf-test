@@ -64,6 +64,7 @@ enum { MECH_GIEF_GRAB = 24, MECH_GIEF_PILEDRIVER = 60 };
 typedef struct {
     bool active;
     bool arcade;
+    bool training;
     unsigned int stage;
     unsigned int picks;
     uint8_t roster[2][TEAM_BATTLE_SIZE];

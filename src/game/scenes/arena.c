@@ -419,7 +419,7 @@ static void arena_end(scene *sc) {
 static bool arena_advance_team(scene *scene, int winner) {
     game_state *gs = scene->gs;
     team_battle *team = &gs->team;
-    if(!team->active) {
+    if(!team->active || team->training) {
         return false;
     }
     if(gs->next_wait_ticks > 0) {
@@ -1458,7 +1458,9 @@ void arena_input_tick(scene *scene) {
 
         ctrl_event *p1 = NULL, *p2 = NULL;
         controller_poll(player1->ctrl, &p1);
-        controller_poll(player2->ctrl, &p2);
+        if(!scene->gs->team.training) {
+            controller_poll(player2->ctrl, &p2);
+        }
 
         arena_handle_events(scene, player1, p1);
         arena_handle_events(scene, player2, p2);
