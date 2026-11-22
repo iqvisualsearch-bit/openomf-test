@@ -616,6 +616,56 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     str_set_c(&burst->footer_string, "sp13s2l30D1-E2-F4-E2-D2");
 }
 
+static void scene_load_mech_gief_lariat(af *fighter) {
+    static const char *const names[] = {
+        "mech-gief-lariat-1.png", "mech-gief-lariat-2.png", "mech-gief-lariat-3.png", "mech-gief-lariat-4.png",
+        "mech-gief-lariat-5.png", "mech-gief-lariat-6.png", "mech-gief-lariat-7.png", "mech-gief-lariat-8.png",
+    };
+    const af_move *side_kick = af_get_move(fighter, MECH_GIEF_LONG_SIDE_KICK);
+    if(!side_kick || af_get_move(fighter, MECH_GIEF_LARIAT)) {
+        return;
+    }
+
+    sprite *poses[8];
+    int pose_count = 0;
+    while(pose_count < 8 && (poses[pose_count] = scene_load_mech_gief_pose(names[pose_count])) != NULL) {
+        pose_count++;
+    }
+    if(pose_count != 8) {
+        for(int i = 0; i < pose_count; i++) {
+            sprite_free(poses[i]);
+            omf_free(poses[i]);
+        }
+        return;
+    }
+
+    af_move *lariat = omf_calloc(1, sizeof(af_move));
+    animation *attack = create_animation_from_single(poses[0], side_kick->ani.start_pos);
+    for(int i = 1; i < 8; i++) {
+        animation_append_sprite(attack, poses[i]);
+    }
+    attack->id = MECH_GIEF_LARIAT;
+    // Keep the pivot planted. Projectile immunity begins with the spin and
+    // ends when the arms start retracting, with one hit per use.
+    str_set_c(&attack->animation_string, "hA5-hzpcps5l40sp7B3-hzpC3-hzpD3-hzpE3-hF3-hG4-hH5");
+
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){-54, -77, 54, -55}, 1);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){-54, -77, 54, -55}, 2);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){-32, -75, 32, -57}, 3);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){-46, -76, 54, -54}, 4);
+
+    lariat->id = MECH_GIEF_LARIAT;
+    lariat->ani = *attack;
+    omf_free(attack);
+    lariat->category = CAT_MEDIUM;
+    lariat->damage = 26;
+    lariat->block_stun = side_kick->block_stun;
+    lariat->points = side_kick->points;
+    str_from_c(&lariat->move_string, "K632");
+    str_from_c(&lariat->footer_string, "sp13s2l35D1-E2-F5-E2-D2");
+    array_set(&fighter->moves, lariat->id, lariat);
+}
+
 int scene_load_har(scene *scene, int player_id) {
     game_player *player = game_state_get_player(scene->gs, player_id);
     if(scene->af_data[player_id]) {
@@ -640,6 +690,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_knockdown(scene->af_data[player_id]);
         scene_load_mech_gief_hit_reactions(scene->af_data[player_id]);
         scene_load_mech_gief_flame_burst(scene->af_data[player_id]);
+        scene_load_mech_gief_lariat(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

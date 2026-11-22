@@ -654,6 +654,14 @@ if(USE_LIBPNG)
         resources/mech-gief-flame-effect-2.png
         resources/mech-gief-flame-effect-3.png
         resources/mech-gief-flame-effect-4.png
+        resources/mech-gief-lariat-1.png
+        resources/mech-gief-lariat-2.png
+        resources/mech-gief-lariat-3.png
+        resources/mech-gief-lariat-4.png
+        resources/mech-gief-lariat-5.png
+        resources/mech-gief-lariat-6.png
+        resources/mech-gief-lariat-7.png
+        resources/mech-gief-lariat-8.png
         resources/mech-gief-air-hit-flinch.png
         resources/mech-gief-air-hit-recoil.png
         resources/mech-gief-air-hit-recover.png

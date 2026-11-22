@@ -1361,11 +1361,14 @@ bool har_is_scout(const object *obj, const har *fighter) {
     return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
 }
 
-static bool har_has_piledriver(const object *obj, const har *fighter) {
+static bool har_is_mech_gief(const object *obj, const har *fighter) {
     const team_battle *team = &obj->gs->team;
     return team->active && team->fighter[fighter->player_id] < TEAM_BATTLE_SIZE &&
-           team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_MECH_GIEF &&
-           af_get_move(fighter->af_data, MECH_GIEF_PILEDRIVER) != NULL;
+           team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_MECH_GIEF;
+}
+
+static bool har_has_piledriver(const object *obj, const har *fighter) {
+    return har_is_mech_gief(obj, fighter) && af_get_move(fighter->af_data, MECH_GIEF_PILEDRIVER) != NULL;
 }
 
 // function to check if har A is hitting har B. Returns 1 if the har is executing a priority move which
@@ -1577,6 +1580,12 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
 
 void har_collide_with_projectile(object *o_har, object *o_pjt) {
     har *h = object_get_userdata(o_har);
+    // Check the lariat before block handling, even for projectiles
+    // whose move metadata uses a category other than CAT_PROJECTILE.
+    if(o_har->cur_animation->id == MECH_GIEF_LARIAT && har_is_mech_gief(o_har, h) &&
+       player_frame_isset(o_har, TAG_ZP)) {
+        return;
+    }
     const af *prog_owner_af_data = projectile_get_af_data(o_pjt);
     har *other = object_get_userdata(
         game_state_find_object(o_har->gs, game_state_get_player(o_har->gs, abs(h->player_id - 1))->har_obj_id));
