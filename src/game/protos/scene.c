@@ -240,6 +240,7 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     grab->next_move = MECH_GIEF_PILEDRIVER;
     grab->successor_id = 35;
     grab->throw_duration = 26;
+    grab->damage = (grab->damage * 115 + 50) / 100;
     // Relative to the victim's mirrored facing, x-9 gives the attacker's
     // grip X. During the rise the renderer pins the victim to the
     // airborne grip, so it shares Mech Gief's visual lift.
