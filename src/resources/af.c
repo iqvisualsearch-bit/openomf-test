@@ -27,6 +27,7 @@ void af_create(af *a, void *src, str *name) {
 
     array_create(&a->moves);
     array_create(&a->sprites);
+    a->original_idle = NULL;
 
     // Moves
     for(int i = 0; i < MAX_AF_MOVES; i++) {
@@ -52,6 +53,11 @@ void af_free(af *a) {
     foreach(it, move) {
         af_move_free(move);
         omf_free(move);
+    }
+    if(a->original_idle) {
+        // Some base animations reference surfaces owned by the original idle.
+        animation_free(a->original_idle);
+        omf_free(a->original_idle);
     }
     array_free(&a->moves);
     array_free(&a->sprites);

@@ -1,4 +1,5 @@
 #include "game/protos/scene.h"
+#include "formats/error.h"
 #include "game/game_player.h"
 #include "game/game_state_type.h"
 #include "resources/af_loader.h"
@@ -90,6 +91,46 @@ int scene_create(scene *scene, game_state *gs, int scene_id) {
     return 0;
 }
 
+static void scene_load_mech_gief_idle(af *fighter) {
+    af_move *idle = af_get_move(fighter, ANIM_IDLE);
+    path filename = get_resource_filename("mech-gief-idle.png");
+    size_t size = 0;
+    if(!idle || !path_filesize(&filename, &size) || size == 0) {
+        log_warn("Mech Gief idle sprite unavailable, using base animation.");
+        return;
+    }
+
+    char *png = omf_malloc(size);
+    sd_vga_image image = {0};
+    bool loaded = path_read_file(&filename, png, size) &&
+                  sd_vga_image_from_png_in_memory(&image, (const unsigned char *)png, size, true, NULL) == SD_SUCCESS;
+    omf_free(png);
+    if(!loaded) {
+        if(image.data) {
+            sd_vga_image_free(&image);
+        }
+        log_warn("Could not load Mech Gief idle sprite, using base animation.");
+        return;
+    }
+
+    sprite *pose = omf_calloc(1, sizeof(sprite));
+    surface *pixels = omf_calloc(1, sizeof(surface));
+    surface_create_from_data(pixels, image.w, image.h, (const unsigned char *)image.data);
+    sd_vga_image_free(&image);
+    sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
+    pose->owned = true;
+
+    animation *replacement = create_animation_from_single(pose, idle->ani.start_pos);
+    replacement->id = ANIM_IDLE;
+    str_set_c(&replacement->animation_string, "A12");
+
+    // Keep the original surfaces alive for other animations that reference them.
+    fighter->original_idle = replacement;
+    animation original = idle->ani;
+    idle->ani = *replacement;
+    *replacement = original;
+}
+
 int scene_load_har(scene *scene, int player_id) {
     game_player *player = game_state_get_player(scene->gs, player_id);
     if(scene->af_data[player_id]) {
@@ -102,6 +143,12 @@ int scene_load_har(scene *scene, int player_id) {
     if(load_af_file(scene->af_data[player_id], resource_id)) {
         log_error("Unable to load HAR %s (%s)!", har_get_name(player->pilot->har_id), get_resource_name(resource_id));
         return 1;
+    }
+
+    const team_battle *team = &scene->gs->team;
+    if(team->active && team->fighter[player_id] < TEAM_BATTLE_SIZE &&
+       team->roster[player_id][team->fighter[player_id]] == TEAM_HAR_MECH_GIEF) {
+        scene_load_mech_gief_idle(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

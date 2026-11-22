@@ -569,6 +569,15 @@ endif()
 # Copy some resources to destination resources directory to ease development setup.
 file(COPY resources/openomf.bk resources/gamecontrollerdb/gamecontrollerdb.txt DESTINATION resources)
 
+if(USE_LIBPNG)
+    configure_file(resources/mech-gief-idle.png resources/mech-gief-idle.png COPYONLY)
+    if(WIN32)
+        install(FILES resources/mech-gief-idle.png DESTINATION openomf/resources COMPONENT Data)
+    else()
+        install(FILES resources/mech-gief-idle.png DESTINATION share/games/openomf/resources COMPONENT Data)
+    endif()
+endif()
+
 if(ENABLE_MODMANAGER AND USE_LIBPNG)
     set(HD_REMASTER_ZIP "${CMAKE_CURRENT_SOURCE_DIR}/mods/hd-remaster.zip")
     configure_file("${HD_REMASTER_ZIP}" "mods/hd-remaster.zip" COPYONLY)
