@@ -107,6 +107,7 @@ static sprite *scene_create_mech_gief_idle_pose(const surface *base, int dip) {
     sprite *pose = omf_calloc(1, sizeof(sprite));
     sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
     pose->owned = true;
+    pose->hit_all_opaque_pixels = true;
     return pose;
 }
 
@@ -135,6 +136,7 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     sd_vga_image_free(&image);
     sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
     pose->owned = true;
+    pose->hit_all_opaque_pixels = true;
     return pose;
 }
 
@@ -179,6 +181,7 @@ static sprite *scene_rotate_mech_gief_spin(const sprite *source) {
     sprite *pose = omf_calloc(1, sizeof(sprite));
     sprite_create_custom(pose, vec2i_create(9 - (base->h - 1 - grip_y), -50 - grip_x), pixels);
     pose->owned = true;
+    pose->hit_all_opaque_pixels = true;
     return pose;
 }
 

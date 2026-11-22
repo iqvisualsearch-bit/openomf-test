@@ -7,12 +7,14 @@ void sprite_create_custom(sprite *sp, vec2i pos, surface *data) {
     sp->id = -1;
     sp->pos = pos;
     sp->data = data;
+    sp->hit_all_opaque_pixels = false;
 }
 
 void sprite_create(sprite *sp, void *src, int id) {
     sd_sprite *sdsprite = (sd_sprite *)src;
     sp->id = id;
     sp->pos = sdsprite->pos;
+    sp->hit_all_opaque_pixels = false;
 
     if(sdsprite->width == 0 || sdsprite->height == 0) {
         sp->data = NULL;
@@ -36,6 +38,7 @@ void sprite_create_reference(sprite *sp, void *src, int id, void *data) {
     sp->id = id;
     sp->pos = sdsprite->pos;
     sp->data = data;
+    sp->hit_all_opaque_pixels = false;
     sp->owned = false;
 }
 
@@ -68,6 +71,7 @@ sprite *sprite_copy(sprite *src) {
     sprite *new = omf_calloc(1, sizeof(sprite));
     new->pos = src->pos;
     new->id = src->id;
+    new->hit_all_opaque_pixels = src->hit_all_opaque_pixels;
 
     // Copy surface
     new->data = omf_calloc(1, sizeof(surface));
