@@ -602,6 +602,18 @@ if(USE_LIBPNG)
         resources/mech-gief-high-kick-active.png
         resources/mech-gief-high-kick-retract.png
         resources/mech-gief-high-kick-recovery.png
+        resources/mech-gief-turning-elbow-startup.png
+        resources/mech-gief-turning-elbow-active.png
+        resources/mech-gief-turning-elbow-retract.png
+        resources/mech-gief-turning-elbow-recovery.png
+        resources/mech-gief-lunging-punch-startup.png
+        resources/mech-gief-lunging-punch-active.png
+        resources/mech-gief-lunging-punch-retract.png
+        resources/mech-gief-lunging-punch-recovery.png
+        resources/mech-gief-long-side-kick-startup.png
+        resources/mech-gief-long-side-kick-active.png
+        resources/mech-gief-long-side-kick-retract.png
+        resources/mech-gief-long-side-kick-recovery.png
         resources/mech-gief-air-hit-flinch.png
         resources/mech-gief-air-hit-recoil.png
         resources/mech-gief-air-hit-recover.png
