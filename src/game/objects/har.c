@@ -621,7 +621,7 @@ void har_move(object *obj) {
             obj->vel.y = -6;
             h->air_stop = 0;
             har_set_ani(obj, ANIM_JUMPING, 0);
-            if(!h->af_data->original_aerial_moves[0]) {
+            if(!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                 object_set_playback_direction(obj, PLAY_BACKWARDS);
                 object_set_tick_pos(obj, -110);
                 object_set_stride(obj, 7); // Pass 7 frames per tick
@@ -707,7 +707,7 @@ void har_move(object *obj) {
             har_floor_landing_effects(obj, true);
         } else if(h->state == STATE_JUMPING && enemy_har->is_grabbed == 0 && !player_frame_isset(obj, TAG_CG)) {
             // The custom jump has a short planted landing frame.
-            if(h->af_data->original_aerial_moves[0]) {
+            if(h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                 h->state = STATE_STANDING;
                 object_set_vel(obj, vec2f_create(0, 0));
                 har_set_ani(obj, ANIM_JUMPING, 0);
@@ -2188,7 +2188,7 @@ static bool add_input(char *buf, int act_type, int direction) {
 bool is_har_idle_air(object *obj) {
     har *h = object_get_userdata(obj);
     return obj->cur_animation->id == ANIM_JUMPING &&
-           (!h->af_data->original_aerial_moves[0] || object_is_airborne(obj)) && game_state_hars_are_alive(obj->gs);
+           (!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT] || object_is_airborne(obj)) && game_state_hars_are_alive(obj->gs);
 }
 
 static void scout_configure_specials(af *data) {
@@ -2624,8 +2624,15 @@ int har_act(object *obj, int act_type) {
                 object_set_vel(obj, vec2f_create(0, 0));
                 break;
             case STATE_STANDING:
-                har_set_ani(obj, ANIM_IDLE, 1);
-                object_set_stride(obj, h->stride);
+                if(h->af_data->original_mech_gief_moves[MECH_GIEF_CROUCH_SLOT] &&
+                   obj->cur_animation->id == ANIM_CROUCHING) {
+                    object_set_repeat(obj, 0);
+                    object_set_custom_string(obj, "D3");
+                    object_select_sprite(obj, 3);
+                } else {
+                    har_set_ani(obj, ANIM_IDLE, 1);
+                    object_set_stride(obj, h->stride);
+                }
                 object_set_vel(obj, vec2f_create(0, 0));
                 break;
             case STATE_WALKTO:
@@ -2645,7 +2652,7 @@ int har_act(object *obj, int act_type) {
                 int jump_dir = 0;
                 if(last_input == '9') {
                     vx = fixedpt_tofloat(h->fwd_speed) * direction;
-                    if(!h->af_data->original_aerial_moves[0]) {
+                    if(!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                         object_set_tick_pos(obj, 110);
                         object_set_stride(obj, 7); // Pass 7 frames per tick
                     }
@@ -2653,14 +2660,14 @@ int har_act(object *obj, int act_type) {
                 } else if(last_input == '7') {
                     // If we are jumping backwards, start animation from end
                     // at -100 frames (seems to be about right)
-                    if(!h->af_data->original_aerial_moves[0]) {
+                    if(!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                         object_set_playback_direction(obj, PLAY_BACKWARDS);
                         object_set_tick_pos(obj, -110);
                         object_set_stride(obj, 7); // Pass 7 frames per tick
                     }
                     vx = fixedpt_tofloat(h->back_speed) * direction * -1;
                     jump_dir = -1;
-                } else if(last_input == '8' && !h->af_data->original_aerial_moves[0]) {
+                } else if(last_input == '8' && !h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                     // If we are jumping upwards
                     object_set_tick_pos(obj, 110);
                     if(h->id == HAR_GARGOYLE) {

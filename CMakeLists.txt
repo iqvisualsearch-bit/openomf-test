@@ -594,6 +594,22 @@ if(USE_LIBPNG)
         resources/mech-gief-jump-apex.png
         resources/mech-gief-jump-landing.png
         resources/mech-gief-jump-takeoff.png
+        resources/mech-gief-crouch-deep.png
+        resources/mech-gief-crouch-hold.png
+        resources/mech-gief-crouch-kick-active.png
+        resources/mech-gief-crouch-kick-recovery.png
+        resources/mech-gief-crouch-kick-retract.png
+        resources/mech-gief-crouch-kick-startup.png
+        resources/mech-gief-crouch-lower.png
+        resources/mech-gief-crouch-punch-active.png
+        resources/mech-gief-crouch-punch-recovery.png
+        resources/mech-gief-crouch-punch-retract.png
+        resources/mech-gief-crouch-punch-startup.png
+        resources/mech-gief-crouch-rise.png
+        resources/mech-gief-walk-far-contact.png
+        resources/mech-gief-walk-far-passing.png
+        resources/mech-gief-walk-near-contact.png
+        resources/mech-gief-walk-near-passing.png
     )
     file(COPY ${MECH_GIEF_SPRITES} DESTINATION resources)
     if(WIN32)

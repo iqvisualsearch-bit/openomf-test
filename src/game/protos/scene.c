@@ -311,15 +311,15 @@ static void scene_load_mech_gief_standing_attacks(af *fighter) {
     }
 }
 
-static void scene_load_mech_gief_aerial_moves(af *fighter) {
+static void scene_load_mech_gief_move_animations(af *fighter) {
     static const struct {
         int id;
         const char *poses[4];
         const char *timing;
         mech_gief_hit_region hit_regions[2];
         int hit_region_count;
-    } moves[] = {
-        {ANIM_JUMPING,
+    } moves[MECH_GIEF_MOVE_COUNT] = {
+        [MECH_GIEF_JUMP_SLOT] = {ANIM_JUMPING,
          {"mech-gief-jump-anticipation.png", "mech-gief-jump-takeoff.png", "mech-gief-jump-apex.png",
           "mech-gief-jump-landing.png"},
          "A3-B7-C120", {{0, 0, 0, 0}}, 0},
@@ -331,6 +331,22 @@ static void scene_load_mech_gief_aerial_moves(af *fighter) {
          {"mech-gief-dropkick-startup.png", "mech-gief-dropkick-active.png",
           "mech-gief-dropkick-follow-through.png", "mech-gief-dropkick-recovery.png"},
          "A6-cps5l37sp7B7-C5-D7", {{-12, -52, 40, -24}, {36, -72, 72, -20}}, 2},
+        {ANIM_WALKING,
+         {"mech-gief-walk-near-contact.png", "mech-gief-walk-far-passing.png", "mech-gief-walk-far-contact.png",
+          "mech-gief-walk-near-passing.png"},
+         "A7-B6-C7-D6", {{0, 0, 0, 0}}, 0},
+        [MECH_GIEF_CROUCH_SLOT] = {ANIM_CROUCHING,
+         {"mech-gief-crouch-lower.png", "mech-gief-crouch-deep.png", "mech-gief-crouch-hold.png",
+          "mech-gief-crouch-rise.png"},
+         "A4-B12-C12-d4C1", {{0, 0, 0, 0}}, 0},
+        {39, // Nova's grounded Down + Punch.
+         {"mech-gief-crouch-punch-startup.png", "mech-gief-crouch-punch-active.png", "mech-gief-crouch-punch-retract.png",
+          "mech-gief-crouch-punch-recovery.png"},
+         "A5-cps5l33sp7B4-C3-D4", {{0, -53, 36, -37}, {32, -57, 60, -41}}, 2},
+        {18, // Nova's grounded Down + Kick.
+         {"mech-gief-crouch-kick-startup.png", "mech-gief-crouch-kick-active.png", "mech-gief-crouch-kick-retract.png",
+          "mech-gief-crouch-kick-recovery.png"},
+         "A6-cps5l36sp7B5-C4-D5", {{0, -38, 36, -18}, {32, -38, 64, -14}}, 2},
     };
     for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
         af_move *move = af_get_move(fighter, moves[i].id);
@@ -348,7 +364,7 @@ static void scene_load_mech_gief_aerial_moves(af *fighter) {
                 sprite_free(poses[j]);
                 omf_free(poses[j]);
             }
-            log_warn("Mech Gief aerial sprites unavailable for move %d, using base animation.", move->id);
+            log_warn("Mech Gief sprites unavailable for move %d, using base animation.", move->id);
             continue;
         }
 
@@ -363,7 +379,7 @@ static void scene_load_mech_gief_aerial_moves(af *fighter) {
         }
 
         // Other stock animations may still reference the original sprite surfaces.
-        fighter->original_aerial_moves[i] = replacement;
+        fighter->original_mech_gief_moves[i] = replacement;
         animation original = move->ani;
         move->ani = *replacement;
         *replacement = original;
@@ -390,7 +406,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_idle(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
-        scene_load_mech_gief_aerial_moves(scene->af_data[player_id]);
+        scene_load_mech_gief_move_animations(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

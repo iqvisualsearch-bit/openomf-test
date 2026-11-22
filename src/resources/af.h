@@ -6,6 +6,8 @@
 #include "utils/array.h"
 #include "utils/fixedpt.h"
 
+enum { MECH_GIEF_JUMP_SLOT = 0, MECH_GIEF_CROUCH_SLOT = 4, MECH_GIEF_MOVE_COUNT = 7 };
+
 typedef struct af_t {
     unsigned int id;
     int32_t endurance;
@@ -19,7 +21,7 @@ typedef struct af_t {
     animation *original_idle;
     animation *original_throw;
     animation *original_standing_attacks[2];
-    animation *original_aerial_moves[3];
+    animation *original_mech_gief_moves[MECH_GIEF_MOVE_COUNT];
     char sound_translation_table[30];
 } af;
 
