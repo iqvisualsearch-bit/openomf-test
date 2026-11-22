@@ -367,7 +367,7 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         {33, // Nova's grounded Back + Punch.
          {"mech-gief-turning-elbow-startup.png", "mech-gief-turning-elbow-active.png",
           "mech-gief-turning-elbow-retract.png", "mech-gief-turning-elbow-recovery.png"},
-         "sp7sf-19l49s5A4-aicpB4-njmC3-njmD3", {{0, -76, 28, -56}, {24, -88, 44, -64}}, 2},
+         "sp7sf-19l49s5A4-aicpB4-njmC3-njmD3", {{-4, -80, 32, -48}, {24, -92, 56, -56}}, 2},
         {41, // Nova's grounded Forward + Punch.
          {"mech-gief-lunging-punch-startup.png", "mech-gief-lunging-punch-active.png",
           "mech-gief-lunging-punch-retract.png", "mech-gief-lunging-punch-recovery.png"},
