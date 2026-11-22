@@ -248,17 +248,31 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
               "ex-9y+8D5-efx-9D21-efx-9y+13D4-L6-M20");
 }
 
+// Collision samples are relative to the fighter origin and mirror with facing.
+typedef struct {
+    int left, top, right, bottom;
+} mech_gief_hit_region;
+
+static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region region) {
+    for(int y = region.top; y <= region.bottom; y += 4) {
+        for(int x = region.left; x <= region.right; x += 4) {
+            collision_coord point = {.pos = {x, y}, .frame_index = 1};
+            vector_append(&ani->collision_coords, &point);
+        }
+    }
+}
+
 static void scene_load_mech_gief_standing_attacks(af *fighter) {
     static const struct {
         int move_id;
         const char *poses[3];
         const char *timing;
-        vec2i contact;
+        mech_gief_hit_region hit_regions[2];
     } attacks[] = {
         {43, {"mech-gief-punch-startup.png", "mech-gief-punch-active.png", "mech-gief-punch-recovery.png"},
-         "A5-cps5l40sp7B4-C10", {72, -67}},
+         "A5-cps5l40sp7B4-C10", {{0, -68, 40, -52}, {36, -76, 76, -60}}},
         {42, {"mech-gief-kick-startup.png", "mech-gief-kick-active.png", "mech-gief-kick-recovery.png"},
-         "A7-cps5l40sp7B4-C13", {62, -51}},
+         "A7-cps5l40sp7B4-C13", {{0, -58, 36, -34}, {32, -62, 68, -42}}},
     };
     for(int i = 0; i < 2; i++) {
         af_move *move = af_get_move(fighter, attacks[i].move_id);
@@ -285,15 +299,9 @@ static void scene_load_mech_gief_standing_attacks(af *fighter) {
         animation_append_sprite(pose, poses[1]);
         animation_append_sprite(pose, poses[2]);
         str_set_c(&pose->animation_string, attacks[i].timing);
-        // Contact points in attack-anchors.json are relative to the common
-        // fighter origin. Place the hit points only on the extended pose.
-        const vec2i tip = attacks[i].contact;
-        for(int offset = -4; offset <= 4; offset += 4) {
-            collision_coord point = {.pos = {tip.x - 4, tip.y + offset}, .frame_index = 1};
-            vector_append(&pose->collision_coords, &point);
+        for(int j = 0; j < 2; j++) {
+            scene_add_mech_gief_hit_region(pose, attacks[i].hit_regions[j]);
         }
-        collision_coord point = {.pos = tip, .frame_index = 1};
-        vector_append(&pose->collision_coords, &point);
 
         // Keep the stock animation alive for any shared sprite references.
         fighter->original_standing_attacks[i] = pose;
@@ -308,21 +316,21 @@ static void scene_load_mech_gief_aerial_moves(af *fighter) {
         int id;
         const char *poses[4];
         const char *timing;
-        vec2i contacts[4];
-        int contact_count;
+        mech_gief_hit_region hit_regions[2];
+        int hit_region_count;
     } moves[] = {
         {ANIM_JUMPING,
          {"mech-gief-jump-anticipation.png", "mech-gief-jump-takeoff.png", "mech-gief-jump-apex.png",
           "mech-gief-jump-landing.png"},
-         "A3-B7-C120", {{0, 0}}, 0},
+         "A3-B7-C120", {{0, 0, 0, 0}}, 0},
         {MECH_GIEF_BODY_PRESS,
          {"mech-gief-body-press-startup.png", "mech-gief-body-press-active.png",
           "mech-gief-body-press-follow-through.png", "mech-gief-body-press-recovery.png"},
-         "A5-cps5l37sp7B8-C4-D6", {{20, -43}, {34, -47}, {44, -49}, {55, -51}}, 4},
+         "A5-cps5l37sp7B8-C4-D6", {{-36, -56, 36, -24}, {32, -60, 60, -36}}, 2},
         {MECH_GIEF_DROPKICK,
          {"mech-gief-dropkick-startup.png", "mech-gief-dropkick-active.png",
           "mech-gief-dropkick-follow-through.png", "mech-gief-dropkick-recovery.png"},
-         "A6-cps5l37sp7B7-C5-D7", {{59, -63}, {62, -57}, {60, -47}, {63, -41}}, 4},
+         "A6-cps5l37sp7B7-C5-D7", {{-12, -52, 40, -24}, {36, -72, 72, -20}}, 2},
     };
     for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
         af_move *move = af_get_move(fighter, moves[i].id);
@@ -350,9 +358,8 @@ static void scene_load_mech_gief_aerial_moves(af *fighter) {
             animation_append_sprite(replacement, poses[j]);
         }
         str_set_c(&replacement->animation_string, moves[i].timing);
-        for(int j = 0; j < moves[i].contact_count; j++) {
-            collision_coord point = {.pos = moves[i].contacts[j], .frame_index = 1};
-            vector_append(&replacement->collision_coords, &point);
+        for(int j = 0; j < moves[i].hit_region_count; j++) {
+            scene_add_mech_gief_hit_region(replacement, moves[i].hit_regions[j]);
         }
 
         // Other stock animations may still reference the original sprite surfaces.
