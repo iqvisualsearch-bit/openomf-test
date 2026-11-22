@@ -621,9 +621,11 @@ void har_move(object *obj) {
             obj->vel.y = -6;
             h->air_stop = 0;
             har_set_ani(obj, ANIM_JUMPING, 0);
-            object_set_playback_direction(obj, PLAY_BACKWARDS);
-            object_set_tick_pos(obj, -110);
-            object_set_stride(obj, 7); // Pass 7 frames per tick
+            if(!h->af_data->original_aerial_moves[0]) {
+                object_set_playback_direction(obj, PLAY_BACKWARDS);
+                object_set_tick_pos(obj, -110);
+                object_set_stride(obj, 7); // Pass 7 frames per tick
+            }
         } else {
             object_set_halt(obj, 1);
             h->air_stop--;
@@ -704,9 +706,15 @@ void har_move(object *obj) {
             har_event_land(h, ctrl);
             har_floor_landing_effects(obj, true);
         } else if(h->state == STATE_JUMPING && enemy_har->is_grabbed == 0 && !player_frame_isset(obj, TAG_CG)) {
-            // Change animation from jump to walk or idle,
-            // depending on held inputs
-            if(last_input == '6') {
+            // The custom jump has a short planted landing frame.
+            if(h->af_data->original_aerial_moves[0]) {
+                h->state = STATE_STANDING;
+                object_set_vel(obj, vec2f_create(0, 0));
+                har_set_ani(obj, ANIM_JUMPING, 0);
+                object_set_custom_string(obj, "D6");
+                object_select_sprite(obj, 3);
+                h->executing_move = 1;
+            } else if(last_input == '6') {
                 h->state = STATE_WALKTO;
                 har_set_ani(obj, ANIM_WALKING, 1);
                 object_set_vel(obj, vec2f_create(0, 0));
@@ -2178,7 +2186,9 @@ static bool add_input(char *buf, int act_type, int direction) {
 }
 
 bool is_har_idle_air(object *obj) {
-    return (obj->cur_animation->id == ANIM_JUMPING) && game_state_hars_are_alive(obj->gs);
+    har *h = object_get_userdata(obj);
+    return obj->cur_animation->id == ANIM_JUMPING &&
+           (!h->af_data->original_aerial_moves[0] || object_is_airborne(obj)) && game_state_hars_are_alive(obj->gs);
 }
 
 static void scout_configure_specials(af *data) {
@@ -2635,18 +2645,22 @@ int har_act(object *obj, int act_type) {
                 int jump_dir = 0;
                 if(last_input == '9') {
                     vx = fixedpt_tofloat(h->fwd_speed) * direction;
-                    object_set_tick_pos(obj, 110);
-                    object_set_stride(obj, 7); // Pass 7 frames per tick
+                    if(!h->af_data->original_aerial_moves[0]) {
+                        object_set_tick_pos(obj, 110);
+                        object_set_stride(obj, 7); // Pass 7 frames per tick
+                    }
                     jump_dir = 1;
                 } else if(last_input == '7') {
                     // If we are jumping backwards, start animation from end
                     // at -100 frames (seems to be about right)
-                    object_set_playback_direction(obj, PLAY_BACKWARDS);
-                    object_set_tick_pos(obj, -110);
+                    if(!h->af_data->original_aerial_moves[0]) {
+                        object_set_playback_direction(obj, PLAY_BACKWARDS);
+                        object_set_tick_pos(obj, -110);
+                        object_set_stride(obj, 7); // Pass 7 frames per tick
+                    }
                     vx = fixedpt_tofloat(h->back_speed) * direction * -1;
-                    object_set_stride(obj, 7); // Pass 7 frames per tick
                     jump_dir = -1;
-                } else if(last_input == '8') {
+                } else if(last_input == '8' && !h->af_data->original_aerial_moves[0]) {
                     // If we are jumping upwards
                     object_set_tick_pos(obj, 110);
                     if(h->id == HAR_GARGOYLE) {

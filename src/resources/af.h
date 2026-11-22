@@ -19,6 +19,7 @@ typedef struct af_t {
     animation *original_idle;
     animation *original_throw;
     animation *original_standing_attacks[2];
+    animation *original_aerial_moves[3];
     char sound_translation_table[30];
 } af;
 

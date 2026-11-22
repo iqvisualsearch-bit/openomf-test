@@ -582,6 +582,18 @@ if(USE_LIBPNG)
         resources/mech-gief-kick-startup.png
         resources/mech-gief-kick-active.png
         resources/mech-gief-kick-recovery.png
+        resources/mech-gief-body-press-active.png
+        resources/mech-gief-body-press-follow-through.png
+        resources/mech-gief-body-press-recovery.png
+        resources/mech-gief-body-press-startup.png
+        resources/mech-gief-dropkick-active.png
+        resources/mech-gief-dropkick-follow-through.png
+        resources/mech-gief-dropkick-recovery.png
+        resources/mech-gief-dropkick-startup.png
+        resources/mech-gief-jump-anticipation.png
+        resources/mech-gief-jump-apex.png
+        resources/mech-gief-jump-landing.png
+        resources/mech-gief-jump-takeoff.png
     )
     file(COPY ${MECH_GIEF_SPRITES} DESTINATION resources)
     if(WIN32)

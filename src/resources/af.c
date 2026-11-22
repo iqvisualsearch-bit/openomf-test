@@ -31,6 +31,7 @@ void af_create(af *a, void *src, str *name) {
     a->original_throw = NULL;
     a->original_standing_attacks[0] = NULL;
     a->original_standing_attacks[1] = NULL;
+    memset(a->original_aerial_moves, 0, sizeof(a->original_aerial_moves));
 
     // Moves
     for(int i = 0; i < MAX_AF_MOVES; i++) {
@@ -70,6 +71,12 @@ void af_free(af *a) {
         if(a->original_standing_attacks[i]) {
             animation_free(a->original_standing_attacks[i]);
             omf_free(a->original_standing_attacks[i]);
+        }
+    }
+    for(size_t i = 0; i < sizeof(a->original_aerial_moves) / sizeof(a->original_aerial_moves[0]); i++) {
+        if(a->original_aerial_moves[i]) {
+            animation_free(a->original_aerial_moves[i]);
+            omf_free(a->original_aerial_moves[i]);
         }
     }
     array_free(&a->moves);

@@ -303,6 +303,66 @@ static void scene_load_mech_gief_standing_attacks(af *fighter) {
     }
 }
 
+static void scene_load_mech_gief_aerial_moves(af *fighter) {
+    static const struct {
+        int id;
+        const char *poses[4];
+        const char *timing;
+        vec2i contacts[4];
+        int contact_count;
+    } moves[] = {
+        {ANIM_JUMPING,
+         {"mech-gief-jump-anticipation.png", "mech-gief-jump-takeoff.png", "mech-gief-jump-apex.png",
+          "mech-gief-jump-landing.png"},
+         "A3-B7-C120", {{0, 0}}, 0},
+        {MECH_GIEF_BODY_PRESS,
+         {"mech-gief-body-press-startup.png", "mech-gief-body-press-active.png",
+          "mech-gief-body-press-follow-through.png", "mech-gief-body-press-recovery.png"},
+         "A5-cps5l37sp7B8-C4-D6", {{20, -43}, {34, -47}, {44, -49}, {55, -51}}, 4},
+        {MECH_GIEF_DROPKICK,
+         {"mech-gief-dropkick-startup.png", "mech-gief-dropkick-active.png",
+          "mech-gief-dropkick-follow-through.png", "mech-gief-dropkick-recovery.png"},
+         "A6-cps5l37sp7B7-C5-D7", {{59, -63}, {62, -57}, {60, -47}, {63, -41}}, 4},
+    };
+    for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
+        af_move *move = af_get_move(fighter, moves[i].id);
+        if(!move) {
+            continue;
+        }
+
+        sprite *poses[4];
+        int count = 0;
+        while(count < 4 && (poses[count] = scene_load_mech_gief_pose(moves[i].poses[count])) != NULL) {
+            count++;
+        }
+        if(count != 4) {
+            for(int j = 0; j < count; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Mech Gief aerial sprites unavailable for move %d, using base animation.", move->id);
+            continue;
+        }
+
+        animation *replacement = create_animation_from_single(poses[0], move->ani.start_pos);
+        replacement->id = move->id;
+        for(int j = 1; j < 4; j++) {
+            animation_append_sprite(replacement, poses[j]);
+        }
+        str_set_c(&replacement->animation_string, moves[i].timing);
+        for(int j = 0; j < moves[i].contact_count; j++) {
+            collision_coord point = {.pos = moves[i].contacts[j], .frame_index = 1};
+            vector_append(&replacement->collision_coords, &point);
+        }
+
+        // Other stock animations may still reference the original sprite surfaces.
+        fighter->original_aerial_moves[i] = replacement;
+        animation original = move->ani;
+        move->ani = *replacement;
+        *replacement = original;
+    }
+}
+
 int scene_load_har(scene *scene, int player_id) {
     game_player *player = game_state_get_player(scene->gs, player_id);
     if(scene->af_data[player_id]) {
@@ -323,6 +383,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_idle(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
+        scene_load_mech_gief_aerial_moves(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));
