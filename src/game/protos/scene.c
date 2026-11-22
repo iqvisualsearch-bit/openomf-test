@@ -155,8 +155,11 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     return pose;
 }
 
-animation *scene_create_mech_gief_preview(void) {
-    sprite *pose = scene_load_mech_gief_pose("mech-gief-idle.png");
+animation *scene_create_mech_gief_preview(bool versus) {
+    sprite *pose = versus ? scene_load_mech_gief_pose("mech-gief-versus.png") : NULL;
+    if(!pose) {
+        pose = scene_load_mech_gief_pose("mech-gief-idle.png");
+    }
     if(!pose) {
         return NULL;
     }

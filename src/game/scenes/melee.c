@@ -109,6 +109,7 @@ typedef struct {
 
     text *wins[2];
     animation *mech_gief_preview;
+    surface mech_gief_tile;
     text *team_har_labels[TEAM_HAR_COUNT - HAR_NOVA];
     text *har_title;
     text *titles[2];
@@ -144,6 +145,7 @@ void melee_free(scene *scene) {
     object_free(&local->har[0]);
     object_free(&local->har[1]);
     if(local->mech_gief_preview) {
+        surface_free(&local->mech_gief_tile);
         animation_free(local->mech_gief_preview);
         omf_free(local->mech_gief_preview);
     }
@@ -324,7 +326,7 @@ void update_har(scene *scene, int player) {
             ani = local->mech_gief_preview;
         }
         object_set_pos(har, vec2i_create(player == 0 ? 110 : 210, ani == local->mech_gief_preview ? 98 : 95));
-        har->x_percent = har->y_percent = ani == local->mech_gief_preview ? 0.65f : 1.0f;
+        har->x_percent = har->y_percent = ani == local->mech_gief_preview ? 0.78f : 1.0f;
         object_set_animation(har, ani);
         object_select_sprite(har, 0);
         object_set_repeat(har, 1);
@@ -982,6 +984,11 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
             }
             if(i < HAR_NOVA) {
                 video_draw_size(&local->har_portraits[i].enabled, x, y, 50, 26);
+            } else if(i == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
+                const int player = right && !left ? 1 : 0;
+                video_draw_full(&local->mech_gief_tile, x + 7, y, 36, 19, 0, 0, player * 48,
+                                (player + 1) * 48, 255, 0, 0);
+                text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 17);
             } else {
                 text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 7);
             }
@@ -1002,7 +1009,7 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
     if(!team_active) {
         render_enabled_portrait(local->har_portraits, &local->cursor[0], 0);
     }
-    if(game_state_team_base_har(CURSOR_INDEX(local, 0)) != HAR_NOVA) {
+    if(CURSOR_INDEX(local, 0) != HAR_NOVA) {
         object_render(&local->har[0]);
     }
 
@@ -1024,7 +1031,7 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
         if(!team_active) {
             render_enabled_portrait(local->har_portraits, &local->cursor[1], 1);
         }
-        if(game_state_team_base_har(CURSOR_INDEX(local, 1)) != HAR_NOVA) {
+        if(CURSOR_INDEX(local, 1) != HAR_NOVA) {
             object_render(&local->har[1]);
         }
 
@@ -1113,7 +1120,12 @@ static void load_har_portraits(scene *scene, melee_local *local) {
 
 static void load_hars(scene *scene, melee_local *local, bool player2_is_selectable) {
     if(scene->gs->team.active) {
-        local->mech_gief_preview = scene_create_mech_gief_preview();
+        local->mech_gief_preview = scene_create_mech_gief_preview(false);
+        if(local->mech_gief_preview) {
+            const sprite *pose = animation_get_sprite(local->mech_gief_preview, 0);
+            surface_create_from_surface(&local->mech_gief_tile, 80, 44, 28, 12, pose->data);
+            surface_set_transparency(&local->mech_gief_tile, 0);
+        }
     }
     object_create(&local->har[0], scene->gs, vec2i_create(110, 95), vec2f_create(0, 0));
     update_har(scene, 0);

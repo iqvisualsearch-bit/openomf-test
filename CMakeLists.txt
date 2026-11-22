@@ -572,6 +572,7 @@ file(COPY resources/openomf.bk resources/gamecontrollerdb/gamecontrollerdb.txt D
 if(USE_LIBPNG)
     set(MECH_GIEF_SPRITES
         resources/mech-gief-idle.png
+        resources/mech-gief-versus.png
         resources/mech-gief-grab.png
         resources/mech-gief-airborne-spin.png
         resources/mech-gief-slam.png
