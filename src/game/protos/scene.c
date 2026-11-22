@@ -205,16 +205,9 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
 
     animation *startup = create_animation_from_single(sprite_copy(poses[0]), grab->ani.start_pos);
     startup->id = MECH_GIEF_GRAB;
-    af_move *idle = af_get_move(fighter, ANIM_IDLE);
-    if(fighter->original_idle && idle && animation_get_sprite_count(&idle->ani) == 3) {
-        for(int frame = 0; frame < 3; frame++) {
-            animation_append_sprite(startup, sprite_copy(animation_get_sprite(&idle->ani, frame)));
-        }
-        str_set_c(&startup->animation_string, "A5-B8-C5-D7-C2");
-    } else {
-        animation_append_sprite(startup, sprite_copy(poses[3]));
-        str_set_c(&startup->animation_string, "A5-B22");
-    }
+    // A can connect. B holds the same pose during punishable recovery.
+    animation_append_sprite(startup, sprite_copy(poses[0]));
+    str_set_c(&startup->animation_string, "A5-B22");
     // Preserve references into the stock throw's shared sprite surfaces.
     fighter->original_throw = startup;
     animation original = grab->ani;
