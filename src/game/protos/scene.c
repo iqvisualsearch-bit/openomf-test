@@ -200,7 +200,9 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     }
     sequence->id = MECH_GIEF_PILEDRIVER;
     // Lift the rendered pose while the fighter stays anchored within arena bounds.
-    str_set_c(&sequence->animation_string, "zzA5-zzoy-24B4-zzroy-44B5-zzoy-24B4-bb7C6-D14");
+    str_set_c(&sequence->animation_string, "zzA5-zzoy-32B4-zzroy-60B5-zzoy-32B4-bb7s25l50sp12C6-D14");
+    // Restore Nova's stock throw impact sound for this fighter instance.
+    fighter->sound_translation_table[25] = 70;
     finish->id = MECH_GIEF_PILEDRIVER;
     finish->ani = *sequence;
     omf_free(sequence);
@@ -210,13 +212,13 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
 
     str_set_c(&grab->move_string, "P632");
     grab->next_move = MECH_GIEF_PILEDRIVER;
-    grab->successor_id = 30;
+    grab->successor_id = 35;
     grab->throw_duration = 18;
     // Relative to the victim's mirrored facing, x-9 gives the attacker's
     // grip X. Y offsets combine the frame's grip from anchors.json, the
     // visual lift and the victim's inverted pose origin.
     str_set_c(&grab->footer_string,
-              "ex-9y+8D5-efx-9y-46D4-efx-9y-66D5-efx-9y-46D4-efx-9y+13D4-L6-M20");
+              "ex-9y+8D5-efx-9y-54D4-efx-9y-82D5-efx-9y-54D4-efx-9y+13D4-L6-M20");
 }
 
 int scene_load_har(scene *scene, int player_id) {
