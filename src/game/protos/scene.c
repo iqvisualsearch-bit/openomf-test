@@ -162,6 +162,26 @@ static void scene_load_mech_gief_idle(af *fighter) {
     *replacement = original;
 }
 
+static sprite *scene_rotate_mech_gief_spin(const sprite *source) {
+    const surface *base = source->data;
+    surface *pixels = omf_calloc(1, sizeof(surface));
+    surface_create(pixels, base->h, base->w);
+    for(int y = 0; y < base->h; y++) {
+        for(int x = 0; x < base->w; x++) {
+            pixels->data[x * pixels->w + base->h - 1 - y] = base->data[y * base->w + x];
+        }
+    }
+
+    // Rotate around the grip from anchors.json, keeping its world offset
+    // at (+9, -50) after each quarter turn.
+    int grip_x = 9 - source->pos.x;
+    int grip_y = -50 - source->pos.y;
+    sprite *pose = omf_calloc(1, sizeof(sprite));
+    sprite_create_custom(pose, vec2i_create(9 - (base->h - 1 - grip_y), -50 - grip_x), pixels);
+    pose->owned = true;
+    return pose;
+}
+
 static void scene_load_mech_gief_piledriver(af *fighter) {
     af_move *grab = af_get_move(fighter, MECH_GIEF_GRAB);
     if(!grab || af_get_move(fighter, MECH_GIEF_PILEDRIVER)) {
@@ -186,7 +206,7 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     animation *startup = create_animation_from_single(sprite_copy(poses[0]), grab->ani.start_pos);
     startup->id = MECH_GIEF_GRAB;
     animation_append_sprite(startup, sprite_copy(poses[3]));
-    str_set_c(&startup->animation_string, "A5-B15");
+    str_set_c(&startup->animation_string, "A5-B22");
     // Preserve references into the stock throw's shared sprite surfaces.
     fighter->original_throw = startup;
     animation original = grab->ani;
@@ -198,9 +218,14 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     for(int i = 1; i < 4; i++) {
         animation_append_sprite(sequence, poses[i]);
     }
+    sprite *spin = poses[1];
+    for(int turn = 0; turn < 3; turn++) {
+        spin = scene_rotate_mech_gief_spin(spin);
+        animation_append_sprite(sequence, spin);
+    }
     sequence->id = MECH_GIEF_PILEDRIVER;
     // Lift the rendered pose while the fighter stays anchored within arena bounds.
-    str_set_c(&sequence->animation_string, "zzA5-zzoy-32B4-zzroy-60B5-zzoy-32B4-bb7s25l50sp12C6-D14");
+    str_set_c(&sequence->animation_string, "zzA5-zzs24l40sp12oy-38B4-zzoy-62E4-zzoy-84F5-zzoy-66G4-zzoy-38B4-bb7s25l50sp12C6-D14");
     // Restore Nova's stock throw impact sound for this fighter instance.
     fighter->sound_translation_table[25] = 70;
     finish->id = MECH_GIEF_PILEDRIVER;
@@ -213,12 +238,12 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     str_set_c(&grab->move_string, "P632");
     grab->next_move = MECH_GIEF_PILEDRIVER;
     grab->successor_id = 35;
-    grab->throw_duration = 18;
+    grab->throw_duration = 26;
     // Relative to the victim's mirrored facing, x-9 gives the attacker's
     // grip X. Y offsets combine the frame's grip from anchors.json, the
     // visual lift and the victim's inverted pose origin.
     str_set_c(&grab->footer_string,
-              "ex-9y+8D5-efx-9y-54D4-efx-9y-82D5-efx-9y-54D4-efx-9y+13D4-L6-M20");
+              "ex-9y+8D5-efx-9y-60D4-efx-9y-84D4-efx-9y-106D5-efx-9y-88D4-efx-9y-60D4-efx-9y+13D4-L6-M20");
 }
 
 int scene_load_har(scene *scene, int player_id) {
