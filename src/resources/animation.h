@@ -58,6 +58,7 @@ void animation_free(animation *ani);
 
 int animation_get_sprite_count(animation *ani);
 
+void animation_append_sprite(animation *ani, sprite *sp);
 animation *create_animation_from_single(sprite *sp, vec2i pos);
 void animation_fixup_coordinates(animation *ani, int fix_x, int fix_y);
 

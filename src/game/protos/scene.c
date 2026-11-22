@@ -91,6 +91,25 @@ int scene_create(scene *scene, game_state *gs, int scene_id) {
     return 0;
 }
 
+static sprite *scene_create_mech_gief_idle_pose(const surface *base, int dip) {
+    // Leave the feet and lower legs fixed. Compress only the upper part of
+    // the sprite, keeping the same origin and palette indices across frames.
+    const int fixed_y = 88;
+    surface *pixels = omf_calloc(1, sizeof(surface));
+    surface_create(pixels, base->w, base->h);
+    for(int y = dip; y < base->h; y++) {
+        int source_y = y < fixed_y ? (y - dip) * fixed_y / (fixed_y - dip) : y;
+        for(int x = 0; x < base->w; x++) {
+            pixels->data[y * pixels->w + x] = base->data[source_y * base->w + x];
+        }
+    }
+
+    sprite *pose = omf_calloc(1, sizeof(sprite));
+    sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
+    pose->owned = true;
+    return pose;
+}
+
 static void scene_load_mech_gief_idle(af *fighter) {
     af_move *idle = af_get_move(fighter, ANIM_IDLE);
     path filename = get_resource_filename("mech-gief-idle.png");
@@ -105,7 +124,7 @@ static void scene_load_mech_gief_idle(af *fighter) {
     bool loaded = path_read_file(&filename, png, size) &&
                   sd_vga_image_from_png_in_memory(&image, (const unsigned char *)png, size, true, NULL) == SD_SUCCESS;
     omf_free(png);
-    if(!loaded) {
+    if(!loaded || image.w != 144 || image.h != 120) {
         if(image.data) {
             sd_vga_image_free(&image);
         }
@@ -122,7 +141,9 @@ static void scene_load_mech_gief_idle(af *fighter) {
 
     animation *replacement = create_animation_from_single(pose, idle->ani.start_pos);
     replacement->id = ANIM_IDLE;
-    str_set_c(&replacement->animation_string, "A12");
+    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pixels, 2));
+    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pixels, 4));
+    str_set_c(&replacement->animation_string, "A8-B5-C7-B5");
 
     // Keep the original surfaces alive for other animations that reference them.
     fighter->original_idle = replacement;
