@@ -555,6 +555,62 @@ static void scene_load_mech_gief_hit_reactions(af *fighter) {
     }
 }
 
+static void scene_load_mech_gief_flame_burst(af *fighter) {
+    static const char *const names[] = {
+        "mech-gief-flame-burst-1.png", "mech-gief-flame-burst-2.png",
+        "mech-gief-flame-burst-3.png", "mech-gief-flame-burst-4.png",
+        "mech-gief-flame-effect-1.png", "mech-gief-flame-effect-2.png",
+        "mech-gief-flame-effect-3.png", "mech-gief-flame-effect-4.png",
+    };
+    // Keep Nova's Down-Back, Back + Punch input and reuse its effect slot.
+    af_move *burst = af_get_move(fighter, 31);
+    af_move *flame = af_get_move(fighter, 38);
+    if(!burst || !flame) {
+        return;
+    }
+
+    sprite *poses[8];
+    int count = 0;
+    while(count < 8 && (poses[count] = scene_load_mech_gief_pose(names[count])) != NULL) {
+        count++;
+    }
+    if(count != 8) {
+        for(int i = 0; i < count; i++) {
+            sprite_free(poses[i]);
+            omf_free(poses[i]);
+        }
+        return;
+    }
+
+    animation *attack = create_animation_from_single(poses[0], burst->ani.start_pos);
+    animation *effect = create_animation_from_single(poses[4], flame->ani.start_pos);
+    for(int i = 1; i < 4; i++) {
+        animation_append_sprite(attack, poses[i]);
+        animation_append_sprite(effect, poses[4 + i]);
+    }
+    attack->id = burst->id;
+    effect->id = flame->id;
+    str_set_c(&attack->animation_string, "A5-m38mx+34my-67s5l30sp7B4-C8-D8");
+    str_set_c(&effect->animation_string, "A2-B5-C4-D2");
+    // Only the full jet can hit. The ignition and embers are visual frames.
+    scene_add_mech_gief_hit_region(effect, (mech_gief_hit_region){4, -5, 44, 5}, 1);
+    scene_add_mech_gief_hit_region(effect, (mech_gief_hit_region){4, -4, 36, 4}, 2);
+
+    fighter->original_mech_gief_moves[MECH_GIEF_FLAME_BURST_SLOT] = attack;
+    fighter->original_mech_gief_moves[MECH_GIEF_FLAME_EFFECT_SLOT] = effect;
+    animation original_attack = burst->ani;
+    animation original_effect = flame->ani;
+    burst->ani = *attack;
+    flame->ani = *effect;
+    *attack = original_attack;
+    *effect = original_effect;
+
+    flame->next_move = 0;
+    flame->successor_id = 0;
+    flame->damage = 22;
+    str_set_c(&flame->footer_string, "sp13s2l30D1-E2-F4-E2-D2");
+}
+
 int scene_load_har(scene *scene, int player_id) {
     game_player *player = game_state_get_player(scene->gs, player_id);
     if(scene->af_data[player_id]) {
@@ -578,6 +634,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_move_animations(scene->af_data[player_id]);
         scene_load_mech_gief_knockdown(scene->af_data[player_id]);
         scene_load_mech_gief_hit_reactions(scene->af_data[player_id]);
+        scene_load_mech_gief_flame_burst(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

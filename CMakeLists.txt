@@ -646,6 +646,14 @@ if(USE_LIBPNG)
         resources/mech-gief-hydraulic-crush-2.png
         resources/mech-gief-hydraulic-crush-3.png
         resources/mech-gief-hydraulic-crush-4.png
+        resources/mech-gief-flame-burst-1.png
+        resources/mech-gief-flame-burst-2.png
+        resources/mech-gief-flame-burst-3.png
+        resources/mech-gief-flame-burst-4.png
+        resources/mech-gief-flame-effect-1.png
+        resources/mech-gief-flame-effect-2.png
+        resources/mech-gief-flame-effect-3.png
+        resources/mech-gief-flame-effect-4.png
         resources/mech-gief-air-hit-flinch.png
         resources/mech-gief-air-hit-recoil.png
         resources/mech-gief-air-hit-recover.png
