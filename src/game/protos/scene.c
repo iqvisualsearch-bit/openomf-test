@@ -13,6 +13,7 @@
 #include "video/vga_state.h"
 #include "video/video.h"
 #include <stdlib.h>
+#include <string.h>
 
 // Some internal functions
 void cb_scene_spawn_object(object *parent, int id, vec2i pos, vec2f vel, uint8_t mp_flags, int s, int g,
@@ -134,10 +135,34 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     surface *pixels = omf_calloc(1, sizeof(surface));
     surface_create_from_data(pixels, image.w, image.h, (const unsigned char *)image.data);
     sd_vga_image_free(&image);
+    // The stock palette reserves 16 shades per armor channel. Leave the
+    // darkest outlines, visor highlights, and orange flame effects fixed.
+    if(strncmp(resource, "mech-gief-flame-effect-", sizeof("mech-gief-flame-effect-") - 1) != 0) {
+        for(int i = 0; i < pixels->w * pixels->h; i++) {
+            const unsigned char color = pixels->data[i];
+            if(color >= 176 && color <= 182) {
+                pixels->data[i] = PRIMARY * 16 + 2 * (color - 176) + 2;
+            } else if(color >= 210 && color <= 221) {
+                pixels->data[i] = SECONDARY * 16 + color - 208;
+            } else if(color >= 200 && color <= 205) {
+                pixels->data[i] = TERTIARY * 16 + 2 * (color - 200) + 2;
+            }
+        }
+    }
     sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
     pose->owned = true;
     pose->hit_all_opaque_pixels = true;
     return pose;
+}
+
+animation *scene_create_mech_gief_preview(void) {
+    sprite *pose = scene_load_mech_gief_pose("mech-gief-idle.png");
+    if(!pose) {
+        return NULL;
+    }
+    animation *preview = create_animation_from_single(pose, vec2i_create(0, 0));
+    str_set_c(&preview->animation_string, "A1");
+    return preview;
 }
 
 static void scene_load_mech_gief_idle(af *fighter) {
@@ -614,7 +639,7 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     burst->successor_id = 0;
     burst->damage = 22;
     // Use the same orange palette flash as Pyros and push the opponent back.
-    str_set_c(&burst->footer_string, "vx-11pd240pp55ptp6ptd1ptr40sp13s2l30D1-E2-F6-E3-D3");
+    str_set_c(&burst->footer_string, "kpd240pp55ptp6ptd1ptr40sp13s2l30A2-B3-C3-L5-M400");
 }
 
 static void scene_load_mech_gief_lariat(af *fighter) {

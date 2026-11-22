@@ -108,6 +108,7 @@ typedef struct {
     unsigned int tickbase[2];
 
     text *wins[2];
+    animation *mech_gief_preview;
     text *team_har_labels[TEAM_HAR_COUNT - HAR_NOVA];
     text *har_title;
     text *titles[2];
@@ -142,6 +143,10 @@ void melee_free(scene *scene) {
 
     object_free(&local->har[0]);
     object_free(&local->har[1]);
+    if(local->mech_gief_preview) {
+        animation_free(local->mech_gief_preview);
+        omf_free(local->mech_gief_preview);
+    }
 
     for(int i = 0; i < 10; i++) {
         surface_free(&local->har_portraits[i].enabled);
@@ -315,6 +320,11 @@ void update_har(scene *scene, int player) {
         int preview = game_state_team_base_har(robot);
         // The stock melee file contains ten animated robot previews.
         ani = &bk_get_info(scene->bk_data, 18 + (preview == HAR_NOVA ? HAR_JAGUAR : preview))->ani;
+        if(robot == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
+            ani = local->mech_gief_preview;
+        }
+        object_set_pos(har, vec2i_create(player == 0 ? 110 : 210, ani == local->mech_gief_preview ? 98 : 95));
+        har->x_percent = har->y_percent = ani == local->mech_gief_preview ? 0.65f : 1.0f;
         object_set_animation(har, ani);
         object_select_sprite(har, 0);
         object_set_repeat(har, 1);
@@ -1102,6 +1112,9 @@ static void load_har_portraits(scene *scene, melee_local *local) {
 }
 
 static void load_hars(scene *scene, melee_local *local, bool player2_is_selectable) {
+    if(scene->gs->team.active) {
+        local->mech_gief_preview = scene_create_mech_gief_preview();
+    }
     object_create(&local->har[0], scene->gs, vec2i_create(110, 95), vec2f_create(0, 0));
     update_har(scene, 0);
     if(player2_is_selectable) {
