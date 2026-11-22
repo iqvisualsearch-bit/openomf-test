@@ -562,10 +562,9 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
         "mech-gief-flame-effect-1.png", "mech-gief-flame-effect-2.png",
         "mech-gief-flame-effect-3.png", "mech-gief-flame-effect-4.png",
     };
-    // Keep Nova's Down-Back, Back + Punch input and reuse its effect slot.
-    af_move *burst = af_get_move(fighter, 31);
-    af_move *flame = af_get_move(fighter, 38);
-    if(!burst || !flame) {
+    // Keep Nova's Down-Back, Back + Punch input.
+    af_move *burst = af_get_move(fighter, MECH_GIEF_FLAME_BURST);
+    if(!burst) {
         return;
     }
 
@@ -583,32 +582,38 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     }
 
     animation *attack = create_animation_from_single(poses[0], burst->ani.start_pos);
-    animation *effect = create_animation_from_single(poses[4], flame->ani.start_pos);
-    for(int i = 1; i < 4; i++) {
-        animation_append_sprite(attack, poses[i]);
-        animation_append_sprite(effect, poses[4 + i]);
-    }
+    animation_append_sprite(attack, poses[1]);
+    animation_append_sprite(attack, poses[2]);
+    animation_append_sprite(attack, sprite_copy(poses[2]));
+    animation_append_sprite(attack, poses[3]);
+    animation_append_sprite(attack, sprite_copy(poses[3]));
     attack->id = burst->id;
-    effect->id = flame->id;
-    str_set_c(&attack->animation_string, "A5-m38mx+34my-67s5l30sp7B4-C8-D8");
-    str_set_c(&effect->animation_string, "A2-B5-C4-D2");
-    // Only the full jet can hit. The ignition and embers are visual frames.
-    scene_add_mech_gief_hit_region(effect, (mech_gief_hit_region){4, -5, 44, 5}, 1);
-    scene_add_mech_gief_hit_region(effect, (mech_gief_hit_region){4, -4, 36, 4}, 2);
+    str_set_c(&attack->animation_string, "A5-s5l30sp7B2-cpC5-D4-E2-F8");
+
+    // Attach the effect frames to the mouth. Keep their pixels out of the HAR silhouette.
+    for(int i = 4; i < 8; i++) {
+        poses[i]->pos.x += 34;
+        poses[i]->pos.y -= 67;
+    }
+    animation *effect = create_animation_from_single(poses[4], burst->ani.start_pos);
+    for(int i = 5; i < 8; i++) {
+        animation_append_sprite(effect, poses[i]);
+    }
+    fighter->mech_gief_flame_effect = effect;
+
+    // The full jet and flicker share one hit window.
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -72, 78, -62}, 2);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -71, 70, -63}, 3);
 
     fighter->original_mech_gief_moves[MECH_GIEF_FLAME_BURST_SLOT] = attack;
-    fighter->original_mech_gief_moves[MECH_GIEF_FLAME_EFFECT_SLOT] = effect;
     animation original_attack = burst->ani;
-    animation original_effect = flame->ani;
     burst->ani = *attack;
-    flame->ani = *effect;
     *attack = original_attack;
-    *effect = original_effect;
 
-    flame->next_move = 0;
-    flame->successor_id = 0;
-    flame->damage = 22;
-    str_set_c(&flame->footer_string, "sp13s2l30D1-E2-F4-E2-D2");
+    burst->next_move = 0;
+    burst->successor_id = 0;
+    burst->damage = 22;
+    str_set_c(&burst->footer_string, "sp13s2l30D1-E2-F4-E2-D2");
 }
 
 int scene_load_har(scene *scene, int player_id) {

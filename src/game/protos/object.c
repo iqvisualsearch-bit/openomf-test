@@ -448,6 +448,28 @@ void object_render(object *obj) {
 
     video_draw_full(obj->cur_surface, x, y, w, h, remap_offset, remap_rounds, obj->pal_offset, obj->pal_limit, opacity,
                     flip_mode, options);
+
+    if(obj->group == GROUP_HAR && obj->cur_animation->id == MECH_GIEF_FLAME_BURST) {
+        const har *fighter = object_get_userdata(obj);
+        animation *effect = fighter->af_data->mech_gief_flame_effect;
+        // Attack frames B through E carry the mouth effect. A and F are dry.
+        const int effect_frame = obj->cur_sprite_id - 1;
+        if(effect && effect_frame >= 0 && effect_frame < animation_get_sprite_count(effect)) {
+            const sprite *flame = animation_get_sprite(effect, effect_frame);
+            const int width = flame->data->render_w * obj->x_percent;
+            const int height = flame->data->render_h * obj->y_percent;
+            int offset_x = (flame->pos.x - cur_sprite->pos.x) * obj->x_percent;
+            int offset_y = (flame->pos.y - cur_sprite->pos.y) * obj->y_percent;
+            if(flip_mode & FLIP_HORIZONTAL) {
+                offset_x = w - width - offset_x;
+            }
+            if(flip_mode & FLIP_VERTICAL) {
+                offset_y = h - height - offset_y;
+            }
+            video_draw_full(flame->data, x + offset_x, y + offset_y, width, height, remap_offset, remap_rounds,
+                            obj->pal_offset, obj->pal_limit, opacity, flip_mode, options);
+        }
+    }
 }
 
 void object_render_shadow(object *obj) {

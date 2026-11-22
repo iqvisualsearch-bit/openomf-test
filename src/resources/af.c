@@ -32,6 +32,7 @@ void af_create(af *a, void *src, str *name) {
     a->original_standing_attacks[0] = NULL;
     a->original_standing_attacks[1] = NULL;
     memset(a->original_mech_gief_moves, 0, sizeof(a->original_mech_gief_moves));
+    a->mech_gief_flame_effect = NULL;
     memset(a->mech_gief_reactions, 0, sizeof(a->mech_gief_reactions));
 
     // Moves
@@ -79,6 +80,10 @@ void af_free(af *a) {
             animation_free(a->original_mech_gief_moves[i]);
             omf_free(a->original_mech_gief_moves[i]);
         }
+    }
+    if(a->mech_gief_flame_effect) {
+        animation_free(a->mech_gief_flame_effect);
+        omf_free(a->mech_gief_flame_effect);
     }
     for(int i = 0; i < MECH_GIEF_HIT_COUNT; i++) {
         if(a->mech_gief_reactions[i]) {

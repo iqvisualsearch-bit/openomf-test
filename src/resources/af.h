@@ -14,8 +14,7 @@ enum {
     MECH_GIEF_GET_UP_SLOT = 17,
     MECH_GIEF_KNOCKDOWN_SLOT = 21,
     MECH_GIEF_FLAME_BURST_SLOT = 22,
-    MECH_GIEF_FLAME_EFFECT_SLOT = 23,
-    MECH_GIEF_MOVE_COUNT = 24,
+    MECH_GIEF_MOVE_COUNT = 23,
 };
 enum { MECH_GIEF_HIT_STANDING, MECH_GIEF_HIT_CROUCHING, MECH_GIEF_HIT_AIRBORNE, MECH_GIEF_HIT_COUNT };
 
@@ -33,6 +32,7 @@ typedef struct af_t {
     animation *original_throw;
     animation *original_standing_attacks[2];
     animation *original_mech_gief_moves[MECH_GIEF_MOVE_COUNT];
+    animation *mech_gief_flame_effect;
     animation *mech_gief_reactions[MECH_GIEF_HIT_COUNT];
     char sound_translation_table[30];
 } af;
