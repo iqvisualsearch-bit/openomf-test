@@ -298,6 +298,7 @@ void har_set_ani(object *obj, int animation_id, int repeat) {
     h->damage_done = 0;
     h->damage_received = 0;
     h->hit_confirmed = false;
+    h->piledriver_from_normal = false;
     h->executing_move = 0;
 }
 
@@ -418,6 +419,15 @@ int har_is_blocking(object *obj, af_move *move) {
     return 0;
 }
 
+static bool har_can_grab_normal_hitstun(object *enemy, const har *attacker, const af_move *move) {
+    const har *target = object_get_userdata(enemy);
+    return move->id == MECH_GIEF_GRAB && attacker->piledriver_from_normal &&
+           target->state == STATE_RECOIL && target->health > 0 && !target->rehit_combo &&
+           !object_is_airborne(enemy) && enemy->cur_animation->id == ANIM_DAMAGE &&
+           enemy->cur_sprite_id >= 0 && enemy->cur_sprite_id < ('L' - 'A') &&
+           !player_frame_isset(enemy, TAG_ZZ) && !player_frame_isset(enemy, TAG_ZG);
+}
+
 bool is_in_range(object *obj, object *enemy_obj, af_move *move) {
     har *h = object_get_userdata(obj);
     af_move *check_move = move;
@@ -431,7 +441,12 @@ bool is_in_range(object *obj, object *enemy_obj, af_move *move) {
     if(check_move->successor_id) { // This is a throw with limited range
         // CLOSE moves use the successor id field as a distance requirement
         float throw_range = (float)obj->gs->match_settings.throw_range / 100.0f;
-        if(object_distance(obj, enemy_obj) > check_move->successor_id * throw_range) {
+        // Give the canceled grab room for the normal's initial pushback.
+        int reach = check_move->successor_id;
+        if(har_can_grab_normal_hitstun(enemy_obj, h, move)) {
+            reach += 14;
+        }
+        if(object_distance(obj, enemy_obj) > reach * throw_range) {
             return false;
         }
     }
@@ -1412,8 +1427,9 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
             }
         }
 
-        // is the HAR invulnerable to this kind of attack?
-        if(har_is_invincible(obj_b, move)) {
+        // A hit-confirmed Piledriver can grab standing hitstun, while
+        // preserving throw protection and knockdown immunity.
+        if(har_is_invincible(obj_b, move) && !har_can_grab_normal_hitstun(obj_b, a, move)) {
             return 0;
         }
     }
@@ -2252,14 +2268,22 @@ static bool har_can_cancel_mech_gief_normal(const object *obj, const har *h, int
     int current = obj->cur_animation->id;
     bool neutral_punch = current == MECH_GIEF_NEUTRAL_PUNCH && h->af_data->original_standing_attacks[0];
     bool neutral_kick = current == MECH_GIEF_NEUTRAL_KICK && h->af_data->original_standing_attacks[1];
-    if(!neutral_punch && !neutral_kick) {
-        return false;
+    bool neutral = neutral_punch || neutral_kick;
+    const bool directional = current == MECH_GIEF_TURNING_ELBOW || current == MECH_GIEF_HIGH_KICK ||
+                             current == MECH_GIEF_LUNGING_PUNCH || current == MECH_GIEF_LONG_SIDE_KICK ||
+                             current == MECH_GIEF_HEEL_SWEEP || current == MECH_GIEF_LOW_UPPERCUT ||
+                             current == MECH_GIEF_HAMMERFIST || current == MECH_GIEF_HEEL_STOMP;
+    if(move_id == MECH_GIEF_FLAME_BURST || move_id == MECH_GIEF_GRAB) {
+        const bool available = move_id == MECH_GIEF_FLAME_BURST ? h->af_data->mech_gief_flame_effect != NULL :
+                                                                har_has_piledriver(obj, h);
+        return available && (neutral || directional || current == MECH_GIEF_CROUCH_PUNCH ||
+                             current == MECH_GIEF_CROUCH_KICK);
     }
-
-    return move_id == MECH_GIEF_TURNING_ELBOW || move_id == MECH_GIEF_HIGH_KICK ||
-           move_id == MECH_GIEF_LUNGING_PUNCH || move_id == MECH_GIEF_LONG_SIDE_KICK ||
-           move_id == MECH_GIEF_HEEL_SWEEP || move_id == MECH_GIEF_LOW_UPPERCUT ||
-           move_id == MECH_GIEF_HAMMERFIST || move_id == MECH_GIEF_HEEL_STOMP;
+    return neutral &&
+           (move_id == MECH_GIEF_TURNING_ELBOW || move_id == MECH_GIEF_HIGH_KICK ||
+            move_id == MECH_GIEF_LUNGING_PUNCH || move_id == MECH_GIEF_LONG_SIDE_KICK ||
+            move_id == MECH_GIEF_HEEL_SWEEP || move_id == MECH_GIEF_LOW_UPPERCUT ||
+            move_id == MECH_GIEF_HAMMERFIST || move_id == MECH_GIEF_HEEL_STOMP);
 }
 
 bool is_move_chain_allowed(object *obj, af_move *move) {
@@ -2552,7 +2576,10 @@ int har_act(object *obj, int act_type) {
             object_set_vel(obj, vec2f_create(0, 0));
             har_face_enemy(obj, enemy_obj);
         }
+        const bool piledriver_from_normal = move->id == MECH_GIEF_GRAB &&
+                                           har_can_cancel_mech_gief_normal(obj, h, move->id);
         har_set_ani(obj, move->id, 0);
+        h->piledriver_from_normal = piledriver_from_normal;
         if(har_is_scout(obj, h)) {
             if(move->id == SCOUT_WIND_FRONTAL) {
                 object_set_vel(obj, vec2f_create(9.0f * object_get_direction(obj), 0));

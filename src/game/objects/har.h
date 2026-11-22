@@ -131,6 +131,7 @@ typedef struct har_t {
     uint8_t damage_done;     // Damage was done this animation
     uint8_t damage_received; // Damage was received this animation
     bool hit_confirmed;      // This attack landed without being blocked
+    bool piledriver_from_normal;
     uint8_t air_attacked;
     uint8_t is_wallhugging;    // HAR is standing right next to a wall
     uint8_t is_grabbed;        // Is being moved by another object. Set by ex, ey tags

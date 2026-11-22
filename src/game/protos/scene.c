@@ -343,11 +343,11 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
          {"mech-gief-crouch-lower.png", "mech-gief-crouch-deep.png", "mech-gief-crouch-hold.png",
           "mech-gief-crouch-rise.png"},
          "A4-B12-C12-d4C1", {{0, 0, 0, 0}}, 0},
-        {39, // Nova's grounded Down + Punch.
+        {MECH_GIEF_CROUCH_PUNCH, // Down + Punch.
          {"mech-gief-crouch-punch-startup.png", "mech-gief-crouch-punch-active.png", "mech-gief-crouch-punch-retract.png",
           "mech-gief-crouch-punch-recovery.png"},
          "A5-cps5l33sp7B4-C3-D4", {{0, -53, 36, -37}, {32, -57, 60, -41}}, 2},
-        {18, // Nova's grounded Down + Kick.
+        {MECH_GIEF_CROUCH_KICK, // Down + Kick.
          {"mech-gief-crouch-kick-startup.png", "mech-gief-crouch-kick-active.png", "mech-gief-crouch-kick-retract.png",
           "mech-gief-crouch-kick-recovery.png"},
          "A6-cps5l36sp7B5-C4-D5", {{0, -38, 36, -18}, {32, -38, 64, -14}}, 2},
@@ -602,8 +602,8 @@ static void scene_load_mech_gief_flame_burst(af *fighter) {
     fighter->mech_gief_flame_effect = effect;
 
     // The full jet and flicker share one hit window.
-    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -72, 78, -62}, 2);
-    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -71, 70, -63}, 3);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -76, 102, -58}, 2);
+    scene_add_mech_gief_hit_region(attack, (mech_gief_hit_region){38, -75, 94, -59}, 3);
 
     fighter->original_mech_gief_moves[MECH_GIEF_FLAME_BURST_SLOT] = attack;
     animation original_attack = burst->ani;
