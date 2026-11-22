@@ -614,6 +614,38 @@ if(USE_LIBPNG)
         resources/mech-gief-long-side-kick-active.png
         resources/mech-gief-long-side-kick-retract.png
         resources/mech-gief-long-side-kick-recovery.png
+        resources/mech-gief-low-uppercut-1.png
+        resources/mech-gief-low-uppercut-2.png
+        resources/mech-gief-low-uppercut-3.png
+        resources/mech-gief-low-uppercut-4.png
+        resources/mech-gief-hammerfist-1.png
+        resources/mech-gief-hammerfist-2.png
+        resources/mech-gief-hammerfist-3.png
+        resources/mech-gief-hammerfist-4.png
+        resources/mech-gief-knockdown-1.png
+        resources/mech-gief-knockdown-2.png
+        resources/mech-gief-knockdown-3.png
+        resources/mech-gief-knockdown-4.png
+        resources/mech-gief-get-up-1.png
+        resources/mech-gief-get-up-2.png
+        resources/mech-gief-get-up-3.png
+        resources/mech-gief-get-up-4.png
+        resources/mech-gief-heel-stomp-1.png
+        resources/mech-gief-heel-stomp-2.png
+        resources/mech-gief-heel-stomp-3.png
+        resources/mech-gief-heel-stomp-4.png
+        resources/mech-gief-victory-1.png
+        resources/mech-gief-victory-2.png
+        resources/mech-gief-victory-3.png
+        resources/mech-gief-victory-4.png
+        resources/mech-gief-defeat-1.png
+        resources/mech-gief-defeat-2.png
+        resources/mech-gief-defeat-3.png
+        resources/mech-gief-defeat-4.png
+        resources/mech-gief-hydraulic-crush-1.png
+        resources/mech-gief-hydraulic-crush-2.png
+        resources/mech-gief-hydraulic-crush-3.png
+        resources/mech-gief-hydraulic-crush-4.png
         resources/mech-gief-air-hit-flinch.png
         resources/mech-gief-air-hit-recoil.png
         resources/mech-gief-air-hit-recover.png

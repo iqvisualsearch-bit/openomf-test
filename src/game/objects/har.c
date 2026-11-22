@@ -1030,7 +1030,9 @@ void har_take_damage(object *obj, af_move *move) {
             object_set_stride(obj, 1);
         } else if(launched) {
             log_debug("grounded launch");
-            str_from_c(&custom, "A1-s01l50B2-C2-L5-M400");
+            str_from_c(&custom, h->af_data->original_mech_gief_moves[MECH_GIEF_KNOCKDOWN_SLOT]
+                                    ? "Y1-s01l50B2-C2-L5-M400"
+                                    : "A1-s01l50B2-C2-L5-M400");
             obj->vel.x = -5.0 * object_get_direction(obj);
             obj->vel.y = -9.0;
             object_set_stride(obj, 1);
@@ -2256,7 +2258,8 @@ static bool har_can_cancel_mech_gief_normal(const object *obj, const har *h, int
 
     return move_id == MECH_GIEF_TURNING_ELBOW || move_id == MECH_GIEF_HIGH_KICK ||
            move_id == MECH_GIEF_LUNGING_PUNCH || move_id == MECH_GIEF_LONG_SIDE_KICK ||
-           move_id == MECH_GIEF_HEEL_SWEEP;
+           move_id == MECH_GIEF_HEEL_SWEEP || move_id == MECH_GIEF_LOW_UPPERCUT ||
+           move_id == MECH_GIEF_HAMMERFIST || move_id == MECH_GIEF_HEEL_STOMP;
 }
 
 bool is_move_chain_allowed(object *obj, af_move *move) {
@@ -2782,7 +2785,11 @@ void har_finished(object *obj) {
     } else if(h->state == STATE_RECOIL && player_get_last_frame_letter(obj) == 'M') {
         har_event_recover(h, ctrl);
         h->state = STATE_STANDING_UP;
-        object_set_custom_string(obj, "zzO7-bj2zzO2");
+        if(h->af_data->original_mech_gief_moves[MECH_GIEF_GET_UP_SLOT]) {
+            har_set_ani(obj, ANIM_STANDUP, 0);
+        } else {
+            object_set_custom_string(obj, "zzO7-bj2zzO2");
+        }
     } else if((h->state == STATE_RECOIL || h->state == STATE_STANDING_UP) &&
               (h->endurance >= h->endurance_max || h->endurance < 0)) {
         if(h->state == STATE_RECOIL) {

@@ -256,10 +256,10 @@ typedef struct {
     int left, top, right, bottom;
 } mech_gief_hit_region;
 
-static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region region) {
+static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region region, int active_frame) {
     for(int y = region.top; y <= region.bottom; y += 4) {
         for(int x = region.left; x <= region.right; x += 4) {
-            collision_coord point = {.pos = {x, y}, .frame_index = 1};
+            collision_coord point = {.pos = {x, y}, .frame_index = active_frame};
             vector_append(&ani->collision_coords, &point);
         }
     }
@@ -303,7 +303,7 @@ static void scene_load_mech_gief_standing_attacks(af *fighter) {
         animation_append_sprite(pose, poses[2]);
         str_set_c(&pose->animation_string, attacks[i].timing);
         for(int j = 0; j < 2; j++) {
-            scene_add_mech_gief_hit_region(pose, attacks[i].hit_regions[j]);
+            scene_add_mech_gief_hit_region(pose, attacks[i].hit_regions[j], 1);
         }
 
         // Keep the stock animation alive for any shared sprite references.
@@ -321,7 +321,8 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         const char *timing;
         mech_gief_hit_region hit_regions[2];
         int hit_region_count;
-    } moves[MECH_GIEF_MOVE_COUNT] = {
+        int active_frame;
+    } moves[] = {
         [MECH_GIEF_JUMP_SLOT] = {ANIM_JUMPING,
          {"mech-gief-jump-anticipation.png", "mech-gief-jump-takeoff.png", "mech-gief-jump-apex.png",
           "mech-gief-jump-landing.png"},
@@ -376,7 +377,33 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
          {"mech-gief-long-side-kick-startup.png", "mech-gief-long-side-kick-active.png",
           "mech-gief-long-side-kick-retract.png", "mech-gief-long-side-kick-recovery.png"},
          "sp7sf9l21s5A6-cpB4-njlC3-njlD4", {{0, -60, 36, -36}, {32, -68, 72, -44}}, 2},
+        {MECH_GIEF_LOW_UPPERCUT, // Down-Forward + Punch.
+         {"mech-gief-low-uppercut-1.png", "mech-gief-low-uppercut-2.png", "mech-gief-low-uppercut-3.png",
+          "mech-gief-low-uppercut-4.png"},
+         "A3-B2-cps5l30sp7C4-njmD5", {{0, -64, 32, -44}, {24, -88, 44, -56}}, 2, 2},
+        {MECH_GIEF_HAMMERFIST, // Down-Back + Punch.
+         {"mech-gief-hammerfist-1.png", "mech-gief-hammerfist-2.png", "mech-gief-hammerfist-3.png",
+          "mech-gief-hammerfist-4.png"},
+         "A3-B3-cps5l30sp7C5-nD5", {{0, -56, 36, -32}, {28, -48, 52, -24}}, 2, 2},
+        {MECH_GIEF_HEEL_STOMP, // Down-Forward + Kick.
+         {"mech-gief-heel-stomp-1.png", "mech-gief-heel-stomp-2.png", "mech-gief-heel-stomp-3.png",
+          "mech-gief-heel-stomp-4.png"},
+         "A3-B3-cps5l30sp7C4-njlD6", {{0, -36, 32, -12}, {28, -28, 56, -4}}, 2, 2},
+        [MECH_GIEF_GET_UP_SLOT] = {ANIM_STANDUP,
+         {"mech-gief-get-up-1.png", "mech-gief-get-up-2.png", "mech-gief-get-up-3.png", "mech-gief-get-up-4.png"},
+         "zzA2-zzB3-zzC3-D1", {{0, 0, 0, 0}}, 0, 0},
+        {ANIM_VICTORY,
+         {"mech-gief-victory-1.png", "mech-gief-victory-2.png", "mech-gief-victory-3.png", "mech-gief-victory-4.png"},
+         "jfA4-jfB6-jfC6-jfD18-d16jfD1", {{0, 0, 0, 0}}, 0, 0},
+        {ANIM_DEFEAT,
+         {"mech-gief-defeat-1.png", "mech-gief-defeat-2.png", "mech-gief-defeat-3.png", "mech-gief-defeat-4.png"},
+         "A5-B6-C6-D1200", {{0, 0, 0, 0}}, 0, 0},
+        {MECH_GIEF_HYDRAULIC_CRUSH,
+         {"mech-gief-hydraulic-crush-1.png", "mech-gief-hydraulic-crush-2.png",
+          "mech-gief-hydraulic-crush-3.png", "mech-gief-hydraulic-crush-4.png"},
+         "bm10amebex+42A1-uabeA6-beB9-bes25l50sp12C5-beD12", {{0, 0, 0, 0}}, 0, 0},
     };
+    _Static_assert(sizeof(moves) / sizeof(moves[0]) == MECH_GIEF_KNOCKDOWN_SLOT, "Mech Gief move slots");
     for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
         af_move *move = af_get_move(fighter, moves[i].id);
         if(!move) {
@@ -405,7 +432,7 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         }
         str_set_c(&replacement->animation_string, moves[i].timing);
         for(int j = 0; j < moves[i].hit_region_count; j++) {
-            scene_add_mech_gief_hit_region(replacement, moves[i].hit_regions[j]);
+            scene_add_mech_gief_hit_region(replacement, moves[i].hit_regions[j], moves[i].active_frame ? moves[i].active_frame : 1);
         }
 
         // Other stock animations may still reference the original sprite surfaces.
@@ -413,7 +440,64 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         animation original = move->ani;
         move->ani = *replacement;
         *replacement = original;
+        if(move->id == MECH_GIEF_HYDRAULIC_CRUSH) {
+            str_set_c(&move->footer_string, "ex-38M7-ex-25y-64hL9-ex-32gM5-M12");
+            str_set_c(&move->move_string, "P412");
+        }
     }
+}
+
+static void scene_load_mech_gief_knockdown(af *fighter) {
+    static const char *const names[] = {
+        "mech-gief-knockdown-1.png", "mech-gief-knockdown-2.png",
+        "mech-gief-knockdown-3.png", "mech-gief-knockdown-4.png",
+    };
+    af_move *damage = af_get_move(fighter, ANIM_DAMAGE);
+    // Nova uses A through X. Add the opening recoil at Y and keep the engine's L/M/N semantics.
+    if(!damage || animation_get_sprite_count(&damage->ani) != 24) {
+        return;
+    }
+    sprite *poses[4];
+    int count = 0;
+    while(count < 4 && (poses[count] = scene_load_mech_gief_pose(names[count])) != NULL) {
+        count++;
+    }
+    if(count != 4) {
+        for(int i = 0; i < count; i++) {
+            sprite_free(poses[i]);
+            omf_free(poses[i]);
+        }
+        return;
+    }
+
+    sprite *first = omf_calloc(1, sizeof(sprite));
+    const sprite *stock_first = animation_get_sprite(&damage->ani, 0);
+    if(stock_first) {
+        *first = *stock_first;
+        first->owned = false;
+    }
+    animation *replacement = create_animation_from_single(first, damage->ani.start_pos);
+    replacement->id = ANIM_DAMAGE;
+    str_set_c(&replacement->animation_string, str_c(&damage->ani.animation_string));
+    for(int i = 1; i < 24; i++) {
+        if(i >= 11 && i <= 13) {
+            const int poses_by_slot[] = {1, 3, 2};
+            animation_append_sprite(replacement, poses[poses_by_slot[i - 11]]);
+        } else {
+            const sprite *stock = animation_get_sprite(&damage->ani, i);
+            sprite *borrowed = omf_calloc(1, sizeof(sprite));
+            if(stock) {
+                *borrowed = *stock;
+                borrowed->owned = false;
+            }
+            animation_append_sprite(replacement, borrowed);
+        }
+    }
+    animation_append_sprite(replacement, poses[0]);
+    fighter->original_mech_gief_moves[MECH_GIEF_KNOCKDOWN_SLOT] = replacement;
+    animation original = damage->ani;
+    damage->ani = *replacement;
+    *replacement = original;
 }
 
 static void scene_load_mech_gief_hit_reactions(af *fighter) {
@@ -492,6 +576,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
         scene_load_mech_gief_move_animations(scene->af_data[player_id]);
+        scene_load_mech_gief_knockdown(scene->af_data[player_id]);
         scene_load_mech_gief_hit_reactions(scene->af_data[player_id]);
     }
 
