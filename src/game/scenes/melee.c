@@ -110,7 +110,7 @@ typedef struct {
     text *wins[2];
     animation *mech_gief_preview;
     surface mech_gief_tile;
-    text *team_har_labels[TEAM_HAR_COUNT - HAR_NOVA];
+    text *team_har_labels[TEAM_HAR_MECH_GIEF - HAR_NOVA];
     text *har_title;
     text *titles[2];
     text *player_name[2];
@@ -167,7 +167,7 @@ void melee_free(scene *scene) {
         text_free(&local->player_stats[i]);
     }
     text_free(&local->har_title);
-    for(int i = 0; i < TEAM_HAR_COUNT - HAR_NOVA; i++) {
+    for(int i = 0; i < TEAM_HAR_MECH_GIEF - HAR_NOVA; i++) {
         text_free(&local->team_har_labels[i]);
     }
 
@@ -276,10 +276,12 @@ void melee_tick(scene *scene, int paused) {
         } while((i = i->next) != NULL);
     }
 
-    if(local->page == HAR_SELECT && local->ticks % 10 == 1) {
-        object_dynamic_tick(&local->har[0]);
-        if(player2->selectable) {
-            object_dynamic_tick(&local->har[1]);
+    if(local->page == HAR_SELECT) {
+        for(int player = 0; player < (player2->selectable ? 2 : 1); player++) {
+            object *preview = &local->har[player];
+            if(preview->cur_animation == local->mech_gief_preview || local->ticks % 10 == 1) {
+                object_dynamic_tick(preview);
+            }
         }
     }
 
@@ -986,10 +988,9 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
                 video_draw_size(&local->har_portraits[i].enabled, x, y, 50, 26);
             } else if(i == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
                 const int player = right && !left ? 1 : 0;
-                video_draw_full(&local->mech_gief_tile, x + 8, y + 1, 34, 16, 0, 0, player * 48,
+                video_draw_full(&local->mech_gief_tile, x + 1, y, 48, 26, 0, 0, player * 48,
                                 (player + 1) * 48, 255, 0, 0);
-                text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 16);
-            } else {
+            } else if(i < TEAM_HAR_MECH_GIEF) {
                 text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 7);
             }
         }
@@ -1222,7 +1223,6 @@ int melee_create(scene *scene) {
     if(scene->gs->team.active) {
         local->team_har_labels[0] = create_green_text(54, 12, "NOVA");
         local->team_har_labels[1] = create_green_text(54, 12, "SCOUT");
-        local->team_har_labels[2] = create_green_text(54, 12, "MECH GIEF");
     }
     local->har_title = create_black_text(320, 6, har_get_name(CURSOR_INDEX(local, 0)));
 

@@ -185,6 +185,12 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     return scene_load_mech_gief_pose_with_palette(resource, NULL);
 }
 
+static void scene_set_mech_gief_idle_loop(animation *ani, const sprite *pose) {
+    animation_append_sprite(ani, scene_create_mech_gief_idle_pose(pose->data, 2));
+    animation_append_sprite(ani, scene_create_mech_gief_idle_pose(pose->data, 4));
+    str_set_c(&ani->animation_string, "A8-B5-C7-B5");
+}
+
 animation *scene_create_mech_gief_preview(scene *sc, bool versus) {
     const vga_palette *palette = bk_get_palette(sc->bk_data, 0);
     sprite *pose = versus ? scene_load_mech_gief_pose_with_palette("mech-gief-versus.png", palette) : NULL;
@@ -195,7 +201,11 @@ animation *scene_create_mech_gief_preview(scene *sc, bool versus) {
         return NULL;
     }
     animation *preview = create_animation_from_single(pose, vec2i_create(0, 0));
-    str_set_c(&preview->animation_string, "A1");
+    if(versus) {
+        str_set_c(&preview->animation_string, "A1");
+    } else {
+        scene_set_mech_gief_idle_loop(preview, pose);
+    }
     return preview;
 }
 
@@ -212,9 +222,7 @@ static void scene_load_mech_gief_idle(af *fighter) {
 
     animation *replacement = create_animation_from_single(pose, idle->ani.start_pos);
     replacement->id = ANIM_IDLE;
-    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pose->data, 2));
-    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pose->data, 4));
-    str_set_c(&replacement->animation_string, "A8-B5-C7-B5");
+    scene_set_mech_gief_idle_loop(replacement, pose);
 
     // Keep the original surfaces alive for other animations that reference them.
     fighter->original_idle = replacement;
@@ -529,30 +537,22 @@ static void scene_load_mech_gief_knockdown(af *fighter) {
         return;
     }
 
-    sprite *first = omf_calloc(1, sizeof(sprite));
-    const sprite *stock_first = animation_get_sprite(&damage->ani, 0);
-    if(stock_first) {
-        *first = *stock_first;
-        first->owned = false;
-    }
-    animation *replacement = create_animation_from_single(first, damage->ani.start_pos);
+    animation *replacement = create_animation_from_single(poses[0], damage->ani.start_pos);
     replacement->id = ANIM_DAMAGE;
     str_set_c(&replacement->animation_string, str_c(&damage->ani.animation_string));
-    for(int i = 1; i < 24; i++) {
-        if(i >= 11 && i <= 13) {
+    // Opponents' throw scripts address the victim by frame letter.
+    // Keep L/M/N as knockdown poses and use Mech Gief's recoil for other letters.
+    for(int i = 1; i <= 'Y' - 'A'; i++) {
+        if(i >= 'L' - 'A' && i <= 'N' - 'A') {
             const int poses_by_slot[] = {1, 3, 2};
-            animation_append_sprite(replacement, poses[poses_by_slot[i - 11]]);
+            animation_append_sprite(replacement, poses[poses_by_slot[i - ('L' - 'A')]]);
         } else {
-            const sprite *stock = animation_get_sprite(&damage->ani, i);
-            sprite *borrowed = omf_calloc(1, sizeof(sprite));
-            if(stock) {
-                *borrowed = *stock;
-                borrowed->owned = false;
-            }
-            animation_append_sprite(replacement, borrowed);
+            sprite *recoil = omf_calloc(1, sizeof(sprite));
+            *recoil = *poses[0];
+            recoil->owned = false;
+            animation_append_sprite(replacement, recoil);
         }
     }
-    animation_append_sprite(replacement, poses[0]);
     fighter->original_mech_gief_moves[MECH_GIEF_KNOCKDOWN_SLOT] = replacement;
     animation original = damage->ani;
     damage->ani = *replacement;
