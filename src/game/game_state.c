@@ -1160,10 +1160,16 @@ void _setup_keyboard(game_state *gs, int player_id, int control_id) {
 }
 
 int game_state_team_base_har(int robot) {
+    if(robot == TEAM_HAR_MECH_GIEF) {
+        return HAR_NOVA;
+    }
     return robot == TEAM_HAR_SCOUT ? HAR_JAGUAR : robot;
 }
 
 const char *game_state_team_har_name(int robot) {
+    if(robot == TEAM_HAR_MECH_GIEF) {
+        return "Mech Gief";
+    }
     return robot == TEAM_HAR_SCOUT ? "Scout" : har_get_name(robot);
 }
 

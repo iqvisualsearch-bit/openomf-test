@@ -108,7 +108,7 @@ typedef struct {
     unsigned int tickbase[2];
 
     text *wins[2];
-    text *team_har_labels[2];
+    text *team_har_labels[TEAM_HAR_COUNT - HAR_NOVA];
     text *har_title;
     text *titles[2];
     text *player_name[2];
@@ -160,8 +160,9 @@ void melee_free(scene *scene) {
         text_free(&local->player_stats[i]);
     }
     text_free(&local->har_title);
-    text_free(&local->team_har_labels[0]);
-    text_free(&local->team_har_labels[1]);
+    for(int i = 0; i < TEAM_HAR_COUNT - HAR_NOVA; i++) {
+        text_free(&local->team_har_labels[i]);
+    }
 
     for(unsigned int i = 0; i < local->extra_count; i++) {
         sprite_free(&local->extra_portraits[i]);
@@ -523,14 +524,14 @@ void handle_action(scene *scene, int player, int action) {
                     local->cheat_pilot_stats[player] |= *row + 1;
                 }
             }
-            if(*row == 2 && local->page == HAR_SELECT && *column > 1) {
-                *column = 1;
+            if(*row == 2 && local->page == HAR_SELECT && *column > TEAM_HAR_COUNT - HAR_NOVA - 1) {
+                *column = TEAM_HAR_COUNT - HAR_NOVA - 1;
             }
             reset_cursor_blinky(local, player);
             break;
         case ACT_RIGHT:
             (*column)++;
-            if(*column > (*row == 2 && local->page == HAR_SELECT ? 1 : 4)) {
+            if(*column > (*row == 2 && local->page == HAR_SELECT ? TEAM_HAR_COUNT - HAR_NOVA - 1 : 4)) {
                 *column = 0;
                 if(local->page == PILOT_SELECT) {
                     local->cheat_pilot_stats[player] |= *row + 1;
@@ -548,8 +549,8 @@ void handle_action(scene *scene, int player, int action) {
             if(*row == 0 || (*row == 1 && ((local->page == PILOT_SELECT && local->extra_count == EXTRA_PILOTS) ||
                                          (local->page == HAR_SELECT && scene->gs->team.active)))) {
                 ++*row;
-                if(*row == 2 && local->page == HAR_SELECT && *column > 1) {
-                    *column = 1;
+                if(*row == 2 && local->page == HAR_SELECT && *column > TEAM_HAR_COUNT - HAR_NOVA - 1) {
+                    *column = TEAM_HAR_COUNT - HAR_NOVA - 1;
                 }
             }
             reset_cursor_blinky(local, player);
@@ -956,7 +957,7 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
     // render the stupid unselected HAR portraits before anything
     // so we can render anything else on top of them
     if(team_active) {
-        for(int i = 0; i < 12; i++) {
+        for(int i = 0; i < TEAM_HAR_COUNT; i++) {
             int x = 14 + (i % 5) * 62;
             int y = 113 + (i / 5) * 28;
             bool left = CURSOR_INDEX(local, 0) == i;
@@ -987,7 +988,7 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
     if(!team_active) {
         render_enabled_portrait(local->har_portraits, &local->cursor[0], 0);
     }
-    if(CURSOR_INDEX(local, 0) != HAR_NOVA) {
+    if(game_state_team_base_har(CURSOR_INDEX(local, 0)) != HAR_NOVA) {
         object_render(&local->har[0]);
     }
 
@@ -1009,7 +1010,7 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
         if(!team_active) {
             render_enabled_portrait(local->har_portraits, &local->cursor[1], 1);
         }
-        if(CURSOR_INDEX(local, 1) != HAR_NOVA) {
+        if(game_state_team_base_har(CURSOR_INDEX(local, 1)) != HAR_NOVA) {
             object_render(&local->har[1]);
         }
 
@@ -1192,6 +1193,7 @@ int melee_create(scene *scene) {
     if(scene->gs->team.active) {
         local->team_har_labels[0] = create_green_text(54, 12, "NOVA");
         local->team_har_labels[1] = create_green_text(54, 12, "SCOUT");
+        local->team_har_labels[2] = create_green_text(54, 12, "MECH GIEF");
     }
     local->har_title = create_black_text(320, 6, har_get_name(CURSOR_INDEX(local, 0)));
 
