@@ -594,6 +594,14 @@ if(USE_LIBPNG)
         resources/mech-gief-jump-apex.png
         resources/mech-gief-jump-landing.png
         resources/mech-gief-jump-takeoff.png
+        resources/mech-gief-heel-sweep-startup.png
+        resources/mech-gief-heel-sweep-active.png
+        resources/mech-gief-heel-sweep-retract.png
+        resources/mech-gief-heel-sweep-recovery.png
+        resources/mech-gief-high-kick-startup.png
+        resources/mech-gief-high-kick-active.png
+        resources/mech-gief-high-kick-retract.png
+        resources/mech-gief-high-kick-recovery.png
         resources/mech-gief-air-hit-flinch.png
         resources/mech-gief-air-hit-recoil.png
         resources/mech-gief-air-hit-recover.png

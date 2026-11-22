@@ -356,6 +356,14 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         [MECH_GIEF_CROUCH_BLOCK_SLOT] = {ANIM_CROUCHING_BLOCK,
          {"mech-gief-crouch-block-start.png", "mech-gief-crouch-block-brace.png", "mech-gief-crouch-block-end.png"},
          "A1-B1-C1", {{0, 0, 0, 0}}, 0},
+        {19, // Nova's grounded Down-Back + Kick.
+         {"mech-gief-heel-sweep-startup.png", "mech-gief-heel-sweep-active.png", "mech-gief-heel-sweep-retract.png",
+          "mech-gief-heel-sweep-recovery.png"},
+         "A7-cps5l52sp7B4-C5-D7", {{0, -32, 36, -12}, {32, -28, 72, -4}}, 2},
+        {23, // Nova's grounded Back + Kick.
+         {"mech-gief-high-kick-startup.png", "mech-gief-high-kick-active.png", "mech-gief-high-kick-retract.png",
+          "mech-gief-high-kick-recovery.png"},
+         "A6-cps5l30sp7B5-C5-D6", {{0, -80, 36, -56}, {32, -100, 56, -72}}, 2},
     };
     for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
         af_move *move = af_get_move(fighter, moves[i].id);
