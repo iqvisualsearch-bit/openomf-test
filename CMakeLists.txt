@@ -576,6 +576,12 @@ if(USE_LIBPNG)
         resources/mech-gief-airborne-spin.png
         resources/mech-gief-slam.png
         resources/mech-gief-recovery.png
+        resources/mech-gief-punch-startup.png
+        resources/mech-gief-punch-active.png
+        resources/mech-gief-punch-recovery.png
+        resources/mech-gief-kick-startup.png
+        resources/mech-gief-kick-active.png
+        resources/mech-gief-kick-recovery.png
     )
     file(COPY ${MECH_GIEF_SPRITES} DESTINATION resources)
     if(WIN32)

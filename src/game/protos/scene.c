@@ -248,6 +248,61 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
               "ex-9y+8D5-efx-9D21-efx-9y+13D4-L6-M20");
 }
 
+static void scene_load_mech_gief_standing_attacks(af *fighter) {
+    static const struct {
+        int move_id;
+        const char *poses[3];
+        const char *timing;
+        vec2i contact;
+    } attacks[] = {
+        {43, {"mech-gief-punch-startup.png", "mech-gief-punch-active.png", "mech-gief-punch-recovery.png"},
+         "A5-cps5l40sp7B4-C10", {72, -67}},
+        {42, {"mech-gief-kick-startup.png", "mech-gief-kick-active.png", "mech-gief-kick-recovery.png"},
+         "A7-cps5l40sp7B4-C13", {62, -51}},
+    };
+    for(int i = 0; i < 2; i++) {
+        af_move *move = af_get_move(fighter, attacks[i].move_id);
+        if(!move) {
+            continue;
+        }
+
+        sprite *poses[3];
+        int count = 0;
+        while(count < 3 && (poses[count] = scene_load_mech_gief_pose(attacks[i].poses[count])) != NULL) {
+            count++;
+        }
+        if(count != 3) {
+            for(int j = 0; j < count; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Mech Gief standing attack sprites unavailable, using base animation.");
+            continue;
+        }
+
+        animation *pose = create_animation_from_single(poses[0], move->ani.start_pos);
+        pose->id = move->id;
+        animation_append_sprite(pose, poses[1]);
+        animation_append_sprite(pose, poses[2]);
+        str_set_c(&pose->animation_string, attacks[i].timing);
+        // Contact points in attack-anchors.json are relative to the common
+        // fighter origin. Place the hit points only on the extended pose.
+        const vec2i tip = attacks[i].contact;
+        for(int offset = -4; offset <= 4; offset += 4) {
+            collision_coord point = {.pos = {tip.x - 4, tip.y + offset}, .frame_index = 1};
+            vector_append(&pose->collision_coords, &point);
+        }
+        collision_coord point = {.pos = tip, .frame_index = 1};
+        vector_append(&pose->collision_coords, &point);
+
+        // Keep the stock animation alive for any shared sprite references.
+        fighter->original_standing_attacks[i] = pose;
+        animation original = move->ani;
+        move->ani = *pose;
+        *pose = original;
+    }
+}
+
 int scene_load_har(scene *scene, int player_id) {
     game_player *player = game_state_get_player(scene->gs, player_id);
     if(scene->af_data[player_id]) {
@@ -267,6 +322,7 @@ int scene_load_har(scene *scene, int player_id) {
        team->roster[player_id][team->fighter[player_id]] == TEAM_HAR_MECH_GIEF) {
         scene_load_mech_gief_idle(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
+        scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));
