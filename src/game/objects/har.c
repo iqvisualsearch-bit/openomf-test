@@ -1006,9 +1006,17 @@ void har_take_damage(object *obj, af_move *move) {
 
     // chronos' stasis does not have a hit animation
     if(str_size(string) > 0) {
+        const bool launched = player_frame_isset(other_har, TAG_AI) && move->category != CAT_PROJECTILE;
+        int reaction_pose = MECH_GIEF_HIT_STANDING;
+        if(object_is_airborne(obj) || launched) {
+            reaction_pose = MECH_GIEF_HIT_AIRBORNE;
+        } else if(h->height == HEIGHT_CROUCHING || h->state == STATE_CROUCHBLOCK ||
+                  obj->cur_animation->id == ANIM_CROUCHING_BLOCK) {
+            reaction_pose = MECH_GIEF_HIT_CROUCHING;
+        }
+        animation *reaction = h->throw_duration ? NULL : h->af_data->mech_gief_reactions[reaction_pose];
         h->state = STATE_RECOIL;
-        // Set hit animation
-        object_set_animation(obj, &af_get_move(h->af_data, ANIM_DAMAGE)->ani);
+        object_set_animation(obj, reaction ? reaction : &af_get_move(h->af_data, ANIM_DAMAGE)->ani);
         object_set_repeat(obj, 0);
         if(h->health <= 0) {
             controller *ctrl = game_player_get_ctrl(game_state_get_player(obj->gs, h->player_id));
@@ -1019,7 +1027,7 @@ void har_take_damage(object *obj, af_move *move) {
         if(h->throw_duration) {
             // No special handling
             object_set_stride(obj, 1);
-        } else if(player_frame_isset(other_har, TAG_AI) && (move->category != CAT_PROJECTILE)) {
+        } else if(launched) {
             log_debug("grounded launch");
             str_from_c(&custom, "A1-s01l50B2-C2-L5-M400");
             obj->vel.x = -5.0 * object_get_direction(obj);
@@ -1184,6 +1192,14 @@ void har_spawn_scrap(const object *obj, vec2i pos, int amount) {
     }
 }
 
+static bool har_has_mech_gief_block(const object *obj, const har *h) {
+    if(obj->cur_animation->id == ANIM_STANDING_BLOCK) {
+        return h->af_data->original_mech_gief_moves[MECH_GIEF_STANDING_BLOCK_SLOT] != NULL;
+    }
+    return obj->cur_animation->id == ANIM_CROUCHING_BLOCK &&
+           h->af_data->original_mech_gief_moves[MECH_GIEF_CROUCH_BLOCK_SLOT] != NULL;
+}
+
 void har_block(object *obj, vec2i hit_coord, uint8_t block_stun) {
     har *h = obj->userdata;
     if(h->last_input == '1' || h->last_input == '3') {
@@ -1193,7 +1209,7 @@ void har_block(object *obj, vec2i hit_coord, uint8_t block_stun) {
     }
     // the HARs have a lame blank frame in their animation string, so use a custom one
 
-    object_set_custom_string(obj, "A1");
+    object_set_custom_string(obj, har_has_mech_gief_block(obj, h) && block_stun < 2 ? "B1" : "A1");
     object_set_repeat(obj, 0);
     object_dynamic_tick(obj);
     h->block_duration = block_stun;
@@ -2719,7 +2735,11 @@ void har_finished(object *obj) {
     h->executing_move = 0;
 
     if(h->block_duration && (h->state == STATE_BLOCKSTUN || h->state == STATE_CROUCHBLOCK)) {
-        object_set_custom_string(obj, "A1");
+        const char *pose = "A1";
+        if(har_has_mech_gief_block(obj, h)) {
+            pose = h->block_duration == 1 && obj->cur_sprite_id == 1 ? "C1" : "B1";
+        }
+        object_set_custom_string(obj, pose);
         object_dynamic_tick(obj);
         h->block_duration--;
     } else if(h->state == STATE_SCRAP || h->state == STATE_DESTRUCTION) {

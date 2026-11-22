@@ -347,6 +347,12 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
          {"mech-gief-crouch-kick-startup.png", "mech-gief-crouch-kick-active.png", "mech-gief-crouch-kick-retract.png",
           "mech-gief-crouch-kick-recovery.png"},
          "A6-cps5l36sp7B5-C4-D5", {{0, -38, 36, -18}, {32, -38, 64, -14}}, 2},
+        [MECH_GIEF_STANDING_BLOCK_SLOT] = {ANIM_STANDING_BLOCK,
+         {"mech-gief-standing-block-start.png", "mech-gief-standing-block-brace.png", "mech-gief-standing-block-end.png"},
+         "A1-B1-C1", {{0, 0, 0, 0}}, 0},
+        [MECH_GIEF_CROUCH_BLOCK_SLOT] = {ANIM_CROUCHING_BLOCK,
+         {"mech-gief-crouch-block-start.png", "mech-gief-crouch-block-brace.png", "mech-gief-crouch-block-end.png"},
+         "A1-B1-C1", {{0, 0, 0, 0}}, 0},
     };
     for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
         af_move *move = af_get_move(fighter, moves[i].id);
@@ -356,10 +362,11 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
 
         sprite *poses[4];
         int count = 0;
-        while(count < 4 && (poses[count] = scene_load_mech_gief_pose(moves[i].poses[count])) != NULL) {
+        const int pose_count = moves[i].poses[3] ? 4 : 3;
+        while(count < pose_count && (poses[count] = scene_load_mech_gief_pose(moves[i].poses[count])) != NULL) {
             count++;
         }
-        if(count != 4) {
+        if(count != pose_count) {
             for(int j = 0; j < count; j++) {
                 sprite_free(poses[j]);
                 omf_free(poses[j]);
@@ -370,7 +377,7 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
 
         animation *replacement = create_animation_from_single(poses[0], move->ani.start_pos);
         replacement->id = move->id;
-        for(int j = 1; j < 4; j++) {
+        for(int j = 1; j < pose_count; j++) {
             animation_append_sprite(replacement, poses[j]);
         }
         str_set_c(&replacement->animation_string, moves[i].timing);
@@ -383,6 +390,61 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         animation original = move->ani;
         move->ani = *replacement;
         *replacement = original;
+    }
+}
+
+static void scene_load_mech_gief_hit_reactions(af *fighter) {
+    static const char *const names[MECH_GIEF_HIT_COUNT][3] = {
+        [MECH_GIEF_HIT_STANDING] =
+            {"mech-gief-standing-hit-flinch.png", "mech-gief-standing-hit-recoil.png", "mech-gief-standing-hit-recover.png"},
+        [MECH_GIEF_HIT_CROUCHING] =
+            {"mech-gief-crouch-hit-flinch.png", "mech-gief-crouch-hit-recoil.png", "mech-gief-crouch-hit-recover.png"},
+        [MECH_GIEF_HIT_AIRBORNE] =
+            {"mech-gief-air-hit-flinch.png", "mech-gief-air-hit-recoil.png", "mech-gief-air-hit-recover.png"},
+    };
+    // Reuse the frame letters expected by the attacker's hit script.
+    // Slots L onward retain the stock knockdowns and special reactions.
+    static const int hit_pose[] = {0, 2, 1, 0, 2, 1, 0, 1, 2, 0, 2};
+    af_move *damage = af_get_move(fighter, ANIM_DAMAGE);
+    if(!damage || animation_get_sprite_count(&damage->ani) < (int)(sizeof(hit_pose) / sizeof(hit_pose[0]))) {
+        return;
+    }
+
+    for(int i = 0; i < MECH_GIEF_HIT_COUNT; i++) {
+        sprite *poses[3];
+        int count = 0;
+        while(count < 3 && (poses[count] = scene_load_mech_gief_pose(names[i][count])) != NULL) {
+            count++;
+        }
+        if(count != 3) {
+            for(int j = 0; j < count; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Mech Gief hit reaction %d unavailable, using base animation.", i);
+            continue;
+        }
+
+        animation *reaction = create_animation_from_single(poses[0], damage->ani.start_pos);
+        reaction->id = ANIM_DAMAGE;
+        str_set_c(&reaction->animation_string, str_c(&damage->ani.animation_string));
+        // B owns recovery and C owns recoil. Later slots borrow these surfaces.
+        animation_append_sprite(reaction, poses[2]);
+        animation_append_sprite(reaction, poses[1]);
+        for(int j = 3; j < animation_get_sprite_count(&damage->ani); j++) {
+            sprite *frame = omf_calloc(1, sizeof(sprite));
+            if(j < (int)(sizeof(hit_pose) / sizeof(hit_pose[0]))) {
+                *frame = *poses[hit_pose[j]];
+            } else {
+                const sprite *stock = animation_get_sprite(&damage->ani, j);
+                if(stock) {
+                    *frame = *stock;
+                }
+            }
+            frame->owned = false;
+            animation_append_sprite(reaction, frame);
+        }
+        fighter->mech_gief_reactions[i] = reaction;
     }
 }
 
@@ -407,6 +469,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
         scene_load_mech_gief_move_animations(scene->af_data[player_id]);
+        scene_load_mech_gief_hit_reactions(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));
