@@ -297,6 +297,7 @@ void har_set_ani(object *obj, int animation_id, int repeat) {
     obj->start = obj->pos;
     h->damage_done = 0;
     h->damage_received = 0;
+    h->hit_confirmed = false;
     h->executing_move = 0;
 }
 
@@ -1546,6 +1547,7 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
         }
 
         a->damage_done = 1;
+        a->hit_confirmed = true;
         b->damage_received = 1;
 
         // return if this move had priority
@@ -2239,6 +2241,24 @@ static void scout_configure_specials(af *data) {
     }
 }
 
+static bool har_can_cancel_mech_gief_normal(const object *obj, const har *h, int move_id) {
+    if(!h->hit_confirmed || !h->executing_move || object_is_airborne(obj)) {
+        return false;
+    }
+
+    // The replacement is installed only for Mech Gief, even though Nova shares these IDs.
+    int current = obj->cur_animation->id;
+    bool neutral_punch = current == MECH_GIEF_NEUTRAL_PUNCH && h->af_data->original_standing_attacks[0];
+    bool neutral_kick = current == MECH_GIEF_NEUTRAL_KICK && h->af_data->original_standing_attacks[1];
+    if(!neutral_punch && !neutral_kick) {
+        return false;
+    }
+
+    return move_id == MECH_GIEF_TURNING_ELBOW || move_id == MECH_GIEF_HIGH_KICK ||
+           move_id == MECH_GIEF_LUNGING_PUNCH || move_id == MECH_GIEF_LONG_SIDE_KICK ||
+           move_id == MECH_GIEF_HEEL_SWEEP;
+}
+
 bool is_move_chain_allowed(object *obj, af_move *move) {
     har *h = object_get_userdata(obj);
 
@@ -2275,7 +2295,8 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
 
     // check if the current frame allows chaining
     bool allowed = false;
-    if(player_frame_isset(obj, TAG_JN) && move->id == player_frame_get(obj, TAG_JN)) {
+    if((allowed_in_idle && har_can_cancel_mech_gief_normal(obj, h, move->id)) ||
+       (player_frame_isset(obj, TAG_JN) && move->id == player_frame_get(obj, TAG_JN))) {
         allowed = true;
     } else {
         switch(move->category) {

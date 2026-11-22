@@ -272,9 +272,9 @@ static void scene_load_mech_gief_standing_attacks(af *fighter) {
         const char *timing;
         mech_gief_hit_region hit_regions[2];
     } attacks[] = {
-        {43, {"mech-gief-punch-startup.png", "mech-gief-punch-active.png", "mech-gief-punch-recovery.png"},
+        {MECH_GIEF_NEUTRAL_PUNCH, {"mech-gief-punch-startup.png", "mech-gief-punch-active.png", "mech-gief-punch-recovery.png"},
          "A5-cps5l40sp7B4-C10", {{0, -68, 40, -52}, {36, -76, 76, -60}}},
-        {42, {"mech-gief-kick-startup.png", "mech-gief-kick-active.png", "mech-gief-kick-recovery.png"},
+        {MECH_GIEF_NEUTRAL_KICK, {"mech-gief-kick-startup.png", "mech-gief-kick-active.png", "mech-gief-kick-recovery.png"},
          "A7-cps5l40sp7B4-C13", {{0, -58, 36, -34}, {32, -62, 68, -42}}},
     };
     for(int i = 0; i < 2; i++) {
@@ -356,23 +356,23 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
         [MECH_GIEF_CROUCH_BLOCK_SLOT] = {ANIM_CROUCHING_BLOCK,
          {"mech-gief-crouch-block-start.png", "mech-gief-crouch-block-brace.png", "mech-gief-crouch-block-end.png"},
          "A1-B1-C1", {{0, 0, 0, 0}}, 0},
-        {19, // Nova's grounded Down-Back + Kick.
+        {MECH_GIEF_HEEL_SWEEP, // Down-Back + Kick.
          {"mech-gief-heel-sweep-startup.png", "mech-gief-heel-sweep-active.png", "mech-gief-heel-sweep-retract.png",
           "mech-gief-heel-sweep-recovery.png"},
          "A7-cps5l52sp7B4-C5-D7", {{0, -32, 36, -12}, {32, -28, 72, -4}}, 2},
-        {23, // Nova's grounded Back + Kick.
+        {MECH_GIEF_HIGH_KICK, // Back + Kick.
          {"mech-gief-high-kick-startup.png", "mech-gief-high-kick-active.png", "mech-gief-high-kick-retract.png",
           "mech-gief-high-kick-recovery.png"},
          "A6-cps5l30sp7B5-C5-D6", {{0, -80, 36, -56}, {32, -100, 56, -72}}, 2},
-        {33, // Nova's grounded Back + Punch.
+        {MECH_GIEF_TURNING_ELBOW, // Back + Punch.
          {"mech-gief-turning-elbow-startup.png", "mech-gief-turning-elbow-active.png",
           "mech-gief-turning-elbow-retract.png", "mech-gief-turning-elbow-recovery.png"},
          "sp7sf-19l49s5A4-aicpB4-njmC3-njmD3", {{-4, -80, 32, -48}, {24, -92, 56, -56}}, 2},
-        {41, // Nova's grounded Forward + Punch.
+        {MECH_GIEF_LUNGING_PUNCH, // Forward + Punch.
          {"mech-gief-lunging-punch-startup.png", "mech-gief-lunging-punch-active.png",
           "mech-gief-lunging-punch-retract.png", "mech-gief-lunging-punch-recovery.png"},
          "sp7sf10l20s5A5-cpB4-njmC3-njmD4", {{0, -72, 40, -52}, {36, -76, 76, -60}}, 2},
-        {21, // Nova's grounded Forward + Kick.
+        {MECH_GIEF_LONG_SIDE_KICK, // Forward + Kick.
          {"mech-gief-long-side-kick-startup.png", "mech-gief-long-side-kick-active.png",
           "mech-gief-long-side-kick-retract.png", "mech-gief-long-side-kick-recovery.png"},
          "sp7sf9l21s5A6-cpB4-njlC3-njlD4", {{0, -60, 36, -36}, {32, -68, 72, -44}}, 2},
