@@ -205,8 +205,16 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
 
     animation *startup = create_animation_from_single(sprite_copy(poses[0]), grab->ani.start_pos);
     startup->id = MECH_GIEF_GRAB;
-    animation_append_sprite(startup, sprite_copy(poses[3]));
-    str_set_c(&startup->animation_string, "A5-B22");
+    af_move *idle = af_get_move(fighter, ANIM_IDLE);
+    if(fighter->original_idle && idle && animation_get_sprite_count(&idle->ani) == 3) {
+        for(int frame = 0; frame < 3; frame++) {
+            animation_append_sprite(startup, sprite_copy(animation_get_sprite(&idle->ani, frame)));
+        }
+        str_set_c(&startup->animation_string, "A5-B8-C5-D7-C2");
+    } else {
+        animation_append_sprite(startup, sprite_copy(poses[3]));
+        str_set_c(&startup->animation_string, "A5-B22");
+    }
     // Preserve references into the stock throw's shared sprite surfaces.
     fighter->original_throw = startup;
     animation original = grab->ani;
@@ -240,10 +248,10 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     grab->successor_id = 35;
     grab->throw_duration = 26;
     // Relative to the victim's mirrored facing, x-9 gives the attacker's
-    // grip X. Y offsets combine the frame's grip from anchors.json, the
-    // visual lift and the victim's inverted pose origin.
+    // grip X. The victim's airborne offset follows the piledriver pose
+    // directly in player_run_apply, so it cannot drift out of sync.
     str_set_c(&grab->footer_string,
-              "ex-9y+8D5-efx-9y-60D4-efx-9y-84D4-efx-9y-106D5-efx-9y-88D4-efx-9y-60D4-efx-9y+13D4-L6-M20");
+              "ex-9y+8D5-efx-9D21-efx-9y+13D4-L6-M20");
 }
 
 int scene_load_har(scene *scene, int player_id) {
