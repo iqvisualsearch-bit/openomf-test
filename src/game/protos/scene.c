@@ -241,8 +241,8 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
     grab->successor_id = 35;
     grab->throw_duration = 26;
     // Relative to the victim's mirrored facing, x-9 gives the attacker's
-    // grip X. The victim's airborne offset follows the piledriver pose
-    // directly in player_run_apply, so it cannot drift out of sync.
+    // grip X. During the rise the renderer pins the victim to the
+    // airborne grip, so it shares Mech Gief's visual lift.
     str_set_c(&grab->footer_string,
               "ex-9y+8D5-efx-9D21-efx-9y+13D4-L6-M20");
 }

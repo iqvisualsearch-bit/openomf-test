@@ -457,22 +457,6 @@ void player_run_apply(object *obj) {
         }
     }
 
-    if(obj->group == GROUP_HAR && enemy && enemy->group == GROUP_HAR && enemy->cur_animation &&
-       enemy->cur_animation->id == MECH_GIEF_PILEDRIVER && script_is_tag_set_by_id(frame, TAG_E)) {
-        const har *victim = object_get_userdata(obj);
-        const har *grabber = object_get_userdata(enemy);
-        const team_battle *team = &obj->gs->team;
-        if(victim->throw_duration > 0 && team->active && team->fighter[grabber->player_id] < TEAM_BATTLE_SIZE &&
-           team->roster[grabber->player_id][team->fighter[grabber->player_id]] == TEAM_HAR_MECH_GIEF) {
-            const script_frame *grab_frame = script_reader_frame(&enemy->animation_state.reader);
-            if(grab_frame && script_is_tag_set_by_id(grab_frame, TAG_OY)) {
-                // The airborne grip is 50 pixels above the fighter origin.
-                // Compensate for the victim's inverted recoil sprite anchor.
-                obj->pos.y = enemy->pos.y + script_get_tag_value_by_id(grab_frame, TAG_OY) - 22;
-            }
-        }
-    }
-
     // Handle slide operations on self
     if(obj->slide_state.timer > 0) {
         obj->pos.x += obj->slide_state.vel.x;
