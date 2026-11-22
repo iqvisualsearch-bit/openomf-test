@@ -110,13 +110,11 @@ static sprite *scene_create_mech_gief_idle_pose(const surface *base, int dip) {
     return pose;
 }
 
-static void scene_load_mech_gief_idle(af *fighter) {
-    af_move *idle = af_get_move(fighter, ANIM_IDLE);
-    path filename = get_resource_filename("mech-gief-idle.png");
+static sprite *scene_load_mech_gief_pose(const char *resource) {
+    path filename = get_resource_filename(resource);
     size_t size = 0;
-    if(!idle || !path_filesize(&filename, &size) || size == 0) {
-        log_warn("Mech Gief idle sprite unavailable, using base animation.");
-        return;
+    if(!path_filesize(&filename, &size) || size == 0) {
+        return NULL;
     }
 
     char *png = omf_malloc(size);
@@ -128,8 +126,7 @@ static void scene_load_mech_gief_idle(af *fighter) {
         if(image.data) {
             sd_vga_image_free(&image);
         }
-        log_warn("Could not load Mech Gief idle sprite, using base animation.");
-        return;
+        return NULL;
     }
 
     sprite *pose = omf_calloc(1, sizeof(sprite));
@@ -138,11 +135,24 @@ static void scene_load_mech_gief_idle(af *fighter) {
     sd_vga_image_free(&image);
     sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
     pose->owned = true;
+    return pose;
+}
+
+static void scene_load_mech_gief_idle(af *fighter) {
+    af_move *idle = af_get_move(fighter, ANIM_IDLE);
+    if(!idle) {
+        return;
+    }
+    sprite *pose = scene_load_mech_gief_pose("mech-gief-idle.png");
+    if(!pose) {
+        log_warn("Mech Gief idle sprite unavailable, using base animation.");
+        return;
+    }
 
     animation *replacement = create_animation_from_single(pose, idle->ani.start_pos);
     replacement->id = ANIM_IDLE;
-    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pixels, 2));
-    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pixels, 4));
+    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pose->data, 2));
+    animation_append_sprite(replacement, scene_create_mech_gief_idle_pose(pose->data, 4));
     str_set_c(&replacement->animation_string, "A8-B5-C7-B5");
 
     // Keep the original surfaces alive for other animations that reference them.
@@ -150,6 +160,63 @@ static void scene_load_mech_gief_idle(af *fighter) {
     animation original = idle->ani;
     idle->ani = *replacement;
     *replacement = original;
+}
+
+static void scene_load_mech_gief_piledriver(af *fighter) {
+    af_move *grab = af_get_move(fighter, MECH_GIEF_GRAB);
+    if(!grab || af_get_move(fighter, MECH_GIEF_PILEDRIVER)) {
+        return;
+    }
+    static const char *const resources[] = {
+        "mech-gief-grab.png", "mech-gief-airborne-spin.png", "mech-gief-slam.png", "mech-gief-recovery.png",
+    };
+    sprite *poses[4];
+    for(int i = 0; i < 4; i++) {
+        poses[i] = scene_load_mech_gief_pose(resources[i]);
+        if(!poses[i]) {
+            for(int j = 0; j < i; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Mech Gief Piledriver sprites unavailable, using base throw.");
+            return;
+        }
+    }
+
+    animation *startup = create_animation_from_single(sprite_copy(poses[0]), grab->ani.start_pos);
+    startup->id = MECH_GIEF_GRAB;
+    animation_append_sprite(startup, sprite_copy(poses[3]));
+    str_set_c(&startup->animation_string, "A5-B15");
+    // Preserve references into the stock throw's shared sprite surfaces.
+    fighter->original_throw = startup;
+    animation original = grab->ani;
+    grab->ani = *startup;
+    *startup = original;
+
+    af_move *finish = omf_calloc(1, sizeof(af_move));
+    animation *sequence = create_animation_from_single(poses[0], grab->ani.start_pos);
+    for(int i = 1; i < 4; i++) {
+        animation_append_sprite(sequence, poses[i]);
+    }
+    sequence->id = MECH_GIEF_PILEDRIVER;
+    // Lift the rendered pose while the fighter stays anchored within arena bounds.
+    str_set_c(&sequence->animation_string, "zzA5-zzoy-24B4-zzroy-44B5-zzoy-24B4-bb7C6-D14");
+    finish->id = MECH_GIEF_PILEDRIVER;
+    finish->ani = *sequence;
+    omf_free(sequence);
+    str_from_c(&finish->move_string, "!");
+    str_create(&finish->footer_string);
+    array_set(&fighter->moves, finish->id, finish);
+
+    str_set_c(&grab->move_string, "P632");
+    grab->next_move = MECH_GIEF_PILEDRIVER;
+    grab->successor_id = 30;
+    grab->throw_duration = 18;
+    // Relative to the victim's mirrored facing, x-9 gives the attacker's
+    // grip X. Y offsets combine the frame's grip from anchors.json, the
+    // visual lift and the victim's inverted pose origin.
+    str_set_c(&grab->footer_string,
+              "ex-9y+8D5-efx-9y-46D4-efx-9y-66D5-efx-9y-46D4-efx-9y+13D4-L6-M20");
 }
 
 int scene_load_har(scene *scene, int player_id) {
@@ -170,6 +237,7 @@ int scene_load_har(scene *scene, int player_id) {
     if(team->active && team->fighter[player_id] < TEAM_BATTLE_SIZE &&
        team->roster[player_id][team->fighter[player_id]] == TEAM_HAR_MECH_GIEF) {
         scene_load_mech_gief_idle(scene->af_data[player_id]);
+        scene_load_mech_gief_piledriver(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

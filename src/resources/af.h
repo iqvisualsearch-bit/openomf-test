@@ -17,6 +17,7 @@ typedef struct af_t {
     array sprites;
     array moves;
     animation *original_idle;
+    animation *original_throw;
     char sound_translation_table[30];
 } af;
 

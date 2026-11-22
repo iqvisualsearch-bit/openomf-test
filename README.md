@@ -65,6 +65,9 @@ Scout's specials use directions relative to the opponent:
 - **Wind Frontal** — quarter-circle forward + Kick. Advances with two spinning kicks that can combo.
 - **Dive Kick** — Down + Kick while jumping.
 
+**Mech Gief** uses Spinning Piledriver with **quarter-circle forward + Punch**
+at close range. The grab can miss against crouching or airborne opponents.
+
 ### HD remaster artwork
 
 Desktop builds from this fork include the HD remaster in `mods/hd-remaster.zip`. The game loads the ZIP automatically when mod and PNG support are enabled. It replaces the intro logos, two versus portraits, four tournament player portraits, and the arena announcements and round numbers. To use it with an existing compatible OpenOMF installation, copy the ZIP into the game's `mods` directory alongside `resources` and leave it zipped.

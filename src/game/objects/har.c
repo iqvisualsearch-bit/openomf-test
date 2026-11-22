@@ -1319,6 +1319,13 @@ bool har_is_scout(const object *obj, const har *fighter) {
     return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
 }
 
+static bool har_has_piledriver(const object *obj, const har *fighter) {
+    const team_battle *team = &obj->gs->team;
+    return team->active && team->fighter[fighter->player_id] < TEAM_BATTLE_SIZE &&
+           team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_MECH_GIEF &&
+           af_get_move(fighter->af_data, MECH_GIEF_PILEDRIVER) != NULL;
+}
+
 // function to check if har A is hitting har B. Returns 1 if the har is executing a priority move which
 // would interrupt B. Currently only throws are considered priority.
 int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
@@ -1331,6 +1338,10 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
     // Check for collisions by sprite collision points
     af_move *move = af_get_move(a->af_data, obj_a->cur_animation->id);
 
+    if(har_has_piledriver(obj_a, a) && move->id == MECH_GIEF_GRAB &&
+       (obj_a->cur_sprite_id != 0 || object_is_airborne(obj_b) || b->is_grabbed || har_is_crouching(b))) {
+        return 0;
+    }
     if(har_is_scout(obj_a, a) && move->id == SCOUT_TELEPORT &&
        (b->state != STATE_STANDING || object_is_airborne(obj_b) || object_distance(obj_a, obj_b) > 32)) {
         return 0;
@@ -2247,6 +2258,11 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
                 }
                 break;
             case CAT_CLOSE:
+                if(move->id == MECH_GIEF_GRAB && har_has_piledriver(obj, h)) {
+                    // Allow the attempt to whiff. Range is checked when it collides.
+                    allowed = allowed_in_idle && is_har_idle_grounded(obj) && !object_is_airborne(obj);
+                    break;
+                }
                 if(har_is_scout(obj, h) && move->id == SCOUT_TELEPORT) {
                     allowed = allowed_in_idle && is_har_idle_grounded(obj);
                     break;
@@ -2309,10 +2325,14 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
     size_t len;
 
     static const int scout_specials[] = {SCOUT_TELEPORT, SCOUT_WIND_FRONTAL, SCOUT_DIVE_KICK};
-    const int special_count = har_is_scout(obj, h) ? (int)(sizeof(scout_specials) / sizeof(scout_specials[0])) : 0;
+    static const int mech_gief_specials[] = {MECH_GIEF_GRAB};
+    const bool scout = har_is_scout(obj, h);
+    const int *priority_moves = scout ? scout_specials : mech_gief_specials;
+    const int special_count = scout ? (int)(sizeof(scout_specials) / sizeof(scout_specials[0])) :
+                                      (har_has_piledriver(obj, h) ? 1 : 0);
     // Match the longer Scout commands before stock attacks with a shared prefix.
     for(int i = ANIM_SCREW + 1 - special_count; i < MAX_AF_MOVES; i++) {
-        int move_id = i <= ANIM_SCREW ? scout_specials[i - (ANIM_SCREW + 1 - special_count)] : i;
+        int move_id = i <= ANIM_SCREW ? priority_moves[i - (ANIM_SCREW + 1 - special_count)] : i;
         if((move = af_get_move(h->af_data, move_id))) {
             len = str_size(&move->move_string);
             if((str_at(&move->move_string, 0) == prefix &&

@@ -570,11 +570,18 @@ endif()
 file(COPY resources/openomf.bk resources/gamecontrollerdb/gamecontrollerdb.txt DESTINATION resources)
 
 if(USE_LIBPNG)
-    configure_file(resources/mech-gief-idle.png resources/mech-gief-idle.png COPYONLY)
+    set(MECH_GIEF_SPRITES
+        resources/mech-gief-idle.png
+        resources/mech-gief-grab.png
+        resources/mech-gief-airborne-spin.png
+        resources/mech-gief-slam.png
+        resources/mech-gief-recovery.png
+    )
+    file(COPY ${MECH_GIEF_SPRITES} DESTINATION resources)
     if(WIN32)
-        install(FILES resources/mech-gief-idle.png DESTINATION openomf/resources COMPONENT Data)
+        install(FILES ${MECH_GIEF_SPRITES} DESTINATION openomf/resources COMPONENT Data)
     else()
-        install(FILES resources/mech-gief-idle.png DESTINATION share/games/openomf/resources COMPONENT Data)
+        install(FILES ${MECH_GIEF_SPRITES} DESTINATION share/games/openomf/resources COMPONENT Data)
     endif()
 endif()
 
