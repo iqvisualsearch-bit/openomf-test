@@ -157,7 +157,8 @@ static sprite *scene_load_mech_gief_pose_with_palette(const char *resource, cons
     surface *pixels = omf_calloc(1, sizeof(surface));
     surface_create_from_data(pixels, image.w, image.h, (const unsigned char *)image.data);
     sd_vga_image_free(&image);
-    const bool gi_only = strcmp(resource, "shoto-idle.png") == 0;
+    const bool gi_only = strncmp(resource, "shoto-", sizeof("shoto-") - 1) == 0;
+    const bool pulse_orb = strncmp(resource, "shoto-pulse-orb-", sizeof("shoto-pulse-orb-") - 1) == 0;
     // The stock palette reserves 16 shades per armor channel. Leave the
     // darkest outlines, visor highlights, and orange flame effects fixed.
     if(strncmp(resource, "mech-gief-flame-effect-", sizeof("mech-gief-flame-effect-") - 1) != 0) {
@@ -178,7 +179,7 @@ static sprite *scene_load_mech_gief_pose_with_palette(const char *resource, cons
             pixels->data[i] = colors[pixels->data[i]];
         }
     }
-    sprite_create_custom(pose, vec2i_create(-64, -106), pixels);
+    sprite_create_custom(pose, vec2i_create(-64, pulse_orb ? -60 : -106), pixels);
     pose->owned = true;
     pose->hit_all_opaque_pixels = true;
     return pose;
@@ -407,6 +408,72 @@ static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region 
             vector_append(&ani->collision_coords, &point);
         }
     }
+}
+
+static void scene_load_shoto_pulse_shot(af *fighter) {
+    static const char *const resources[] = {
+        "shoto-pulse-shot-1.png",
+        "shoto-pulse-shot-2.png",
+        "shoto-pulse-shot-3.png",
+        "shoto-pulse-shot-4.png",
+        "shoto-pulse-orb-1.png",
+        "shoto-pulse-orb-2.png",
+        "shoto-pulse-orb-3.png",
+    };
+    if(af_get_move(fighter, SHOTO_PULSE_SHOT) || af_get_move(fighter, SHOTO_PULSE_ORB)) {
+        return;
+    }
+
+    sprite *poses[7];
+    for(int i = 0; i < 7; i++) {
+        poses[i] = scene_load_mech_gief_pose(resources[i]);
+        if(!poses[i]) {
+            for(int j = 0; j < i; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Pulse Shot sprite %s unavailable.", resources[i]);
+            return;
+        }
+    }
+
+    animation *cast = create_animation_from_single(poses[0], vec2i_create(0, 0));
+    cast->id = SHOTO_PULSE_SHOT;
+    for(int i = 1; i < 4; i++) {
+        animation_append_sprite(cast, poses[i]);
+    }
+    str_set_c(&cast->animation_string, "A4-B5-m64mx58my-51C4-D11");
+
+    af_move *shot = omf_calloc(1, sizeof(af_move));
+    shot->id = cast->id;
+    shot->category = CAT_MEDIUM;
+    shot->ani = *cast;
+    omf_free(cast);
+    str_from_c(&shot->move_string, "P632");
+    str_create(&shot->footer_string);
+
+    animation *flight = create_animation_from_single(poses[4], vec2i_create(0, 0));
+    flight->id = SHOTO_PULSE_ORB;
+    animation_append_sprite(flight, poses[5]);
+    animation_append_sprite(flight, poses[6]);
+    str_set_c(&flight->animation_string, "vx+5A3-B3-C3-A3-B3-C3-A3-B3-C3-A3-B3-C3-A3-B3-C3-A3-B3-C3-A3-B3-C3");
+    for(int i = 0; i < 3; i++) {
+        scene_add_mech_gief_hit_region(flight, (mech_gief_hit_region){-8, -4, 16, 4}, i);
+    }
+
+    af_move *orb = omf_calloc(1, sizeof(af_move));
+    orb->id = flight->id;
+    orb->category = CAT_PROJECTILE;
+    orb->damage = 15;
+    orb->block_stun = 4;
+    orb->points = 8;
+    orb->ani = *flight;
+    omf_free(flight);
+    str_from_c(&orb->move_string, "!");
+    str_from_c(&orb->footer_string, "A2-B3-C4");
+
+    array_set(&fighter->moves, shot->id, shot);
+    array_set(&fighter->moves, orb->id, orb);
 }
 
 static void scene_load_mech_gief_standing_attacks(af *fighter) {
@@ -844,6 +911,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_lariat(scene->af_data[player_id]);
     } else if(game_state_selected_robot(scene->gs, player_id) == TEAM_HAR_SHOTO) {
         scene_load_custom_idle(scene->af_data[player_id], "shoto-idle.png");
+        scene_load_shoto_pulse_shot(scene->af_data[player_id]);
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

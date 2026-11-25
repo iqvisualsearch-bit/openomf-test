@@ -1754,7 +1754,12 @@ void har_collide_with_projectile(object *o_har, object *o_pjt) {
         h->rehit_combo = air_hit;
         disable_rehit(h, move);
 
-        // Switch to successor animation if one exists for this projectile
+        if(move->id == SHOTO_PULSE_ORB && game_state_selected_robot(o_pjt->gs, other->player_id) == TEAM_HAR_SHOTO) {
+        object_set_finished(o_pjt, true);
+        return;
+    }
+
+    // Switch to successor animation if one exists for this projectile
         // CAT CLOSE is a check for shadow grab, but there's probably a special flag
         if(move->successor_id && move->category != CAT_CLOSE) {
             af_move *next_move = af_get_move(prog_owner_af_data, move->successor_id);
@@ -2459,11 +2464,14 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
 
     static const int scout_specials[] = {SCOUT_TELEPORT, SCOUT_WIND_FRONTAL, SCOUT_DIVE_KICK};
     static const int mech_gief_specials[] = {MECH_GIEF_GRAB, MECH_GIEF_HIP_TOSS};
+    static const int shoto_specials[] = {SHOTO_PULSE_SHOT};
     const bool scout = har_is_scout(obj, h);
-    const int *priority_moves = scout ? scout_specials : mech_gief_specials;
+    const bool shoto = game_state_selected_robot(obj->gs, h->player_id) == TEAM_HAR_SHOTO;
+    const int *priority_moves = scout ? scout_specials : (shoto ? shoto_specials : mech_gief_specials);
     const int special_count = scout ? (int)(sizeof(scout_specials) / sizeof(scout_specials[0])) :
-                                      (har_is_mech_gief(obj, h) ?
-                                           (int)(sizeof(mech_gief_specials) / sizeof(mech_gief_specials[0])) : 0);
+                              shoto ? (int)(sizeof(shoto_specials) / sizeof(shoto_specials[0])) :
+                              har_is_mech_gief(obj, h) ?
+                                  (int)(sizeof(mech_gief_specials) / sizeof(mech_gief_specials[0])) : 0;
     // Give variant commands priority over stock moves with the same input.
     for(int i = ANIM_SCREW + 1 - special_count; i < MAX_AF_MOVES; i++) {
         int move_id = i <= ANIM_SCREW ? priority_moves[i - (ANIM_SCREW + 1 - special_count)] : i;
