@@ -743,6 +743,12 @@ int scene_load_har(scene *scene, int player_id) {
     const team_battle *team = &scene->gs->team;
     if(team->active && team->fighter[player_id] < TEAM_BATTLE_SIZE &&
        team->roster[player_id][team->fighter[player_id]] == TEAM_HAR_MECH_GIEF) {
+        // Nova's P252 command matches Down, neutral, Down + Punch.
+        // Keep the animation data available for references, but unbind the command.
+        af_move *double_down_punch = af_get_move(scene->af_data[player_id], 16);
+        if(double_down_punch && str_equal_c(&double_down_punch->move_string, "P252")) {
+            str_set_c(&double_down_punch->move_string, "!");
+        }
         scene_load_mech_gief_idle(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
