@@ -180,7 +180,7 @@ int cutscene_create(scene *scene) {
             // load all the animations, in order
             // including the one for our HAR
             for(int i = 0; i < 256; i++) {
-                if(i >= 10 && i <= 20 && i != 10 + p1->pilot->har_id) {
+                if(i >= 10 && i <= 20 && i != 10 + game_state_team_base_har(p1->pilot->har_id)) {
                     continue;
                 }
                 bk_info *bki = bk_get_info(scene->bk_data, i);

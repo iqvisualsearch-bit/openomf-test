@@ -555,7 +555,7 @@ int vs_create(scene *scene) {
         // and your money
         // TODO figure out how this really works, but this'll do for now
         int trade_value = calculate_trade_value(player1->pilot);
-        int8_t trades[10];
+        int8_t trades[NUMBER_OF_HAR_TYPES];
         memset(trades, -1, sizeof(trades));
         uint8_t tradecount = 0;
 
@@ -572,9 +572,12 @@ int vs_create(scene *scene) {
             }
         }
 
-        // choose 5 random ones and pack them into the bitmask
-        uint16_t new_trades = 0;
-        for(int i = 0; i < min2(5, tradecount);) {
+        // Reserve one offer for Grappler when the player can afford the trade.
+        const bool offer_grappler = player1->pilot->har_id != HAR_GRAPPLER &&
+                                    har_price(HAR_GRAPPLER) <= trade_value + player1->pilot->money;
+        uint32_t new_trades = offer_grappler ? (1u << HAR_GRAPPLER) : 0;
+        const int stock_offers = offer_grappler ? 4 : 5;
+        for(int i = 0; i < min2(stock_offers, tradecount);) {
             uint8_t choice = rand_int(tradecount);
             if(trades[choice] != -1) {
                 new_trades |= 1 << trades[choice];
@@ -607,10 +610,8 @@ int vs_create(scene *scene) {
     object *player1_har = omf_calloc(1, sizeof(object));
     object_create(player1_har, scene->gs, vec2i_create(160, 0), vec2f_create(0, 0));
     object_set_animation(player1_har, ani);
-    object_select_sprite(player1_har, player1->pilot->har_id);
-    if(player2->pilot) {
-        vs_set_mech_gief_preview(scene, player1_har, 0);
-    }
+    object_select_sprite(player1_har, game_state_team_base_har(player1->pilot->har_id));
+    vs_set_mech_gief_preview(scene, player1_har, 0);
     object_set_halt(player1_har, 1);
     game_state_add_object(scene->gs, player1_har, RENDER_LAYER_MIDDLE, 0, 0);
 
@@ -681,10 +682,11 @@ int vs_create(scene *scene) {
         local->report = create_report_card(fight_stats); // Set up the statistics texts to the right side of the scene
 
         // Let's add some scrapes
-        sprite *har_sprite = animation_get_sprite(player1_har->cur_animation, player1->pilot->har_id);
+        sprite *har_sprite = animation_get_sprite(player1_har->cur_animation, player1_har->cur_sprite_id);
         ani = &bk_get_info(scene->bk_data, 9)->ani;
 
-        int n_scrapes = ((fight_stats->max_hp - fight_stats->hp) * 170) / fight_stats->max_hp;
+        int n_scrapes = fight_stats->max_hp > 0 ?
+                           ((fight_stats->max_hp - fight_stats->hp) * 170) / fight_stats->max_hp : 0;
         log_debug("Creating %d scrapes", n_scrapes);
         int scrape_no;
         for(int n = 0; n < n_scrapes; n++) {

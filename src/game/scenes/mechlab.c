@@ -49,6 +49,7 @@ typedef struct {
     gui_frame *frame;
     gui_frame *dashboard;
     object *mech;
+    animation *grappler_preview;
     dashboard_widgets dw;
     newplayer_widgets nw;
     trnselect_widgets tw;
@@ -59,6 +60,32 @@ typedef struct {
     surface popup_bg1;
     surface popup_bg2;
 } mechlab_local;
+
+static animation *mechlab_preview_animation(scene *scene, int har_id) {
+    mechlab_local *local = scene_get_userdata(scene);
+    if(har_id == HAR_GRAPPLER) {
+        if(!local->grappler_preview) {
+            local->grappler_preview = scene_create_mech_gief_preview(scene, false);
+        }
+        if(local->grappler_preview) {
+            return local->grappler_preview;
+        }
+    }
+    return &bk_get_info(scene->bk_data, 15 + game_state_team_base_har(har_id))->ani;
+}
+
+static void mechlab_start_preview(scene *scene, object *mech, animation *ani) {
+    mechlab_local *local = scene_get_userdata(scene);
+    const bool grappler = ani == local->grappler_preview;
+    const vec2i pos = grappler ? vec2i_create(80, 144) : vec2i_create(0, 0);
+    object_create(mech, scene->gs, pos, vec2f_create(0, 0));
+    object_set_animation(mech, ani);
+    if(grappler) {
+        mech->x_percent = mech->y_percent = 0.85f;
+    }
+    object_set_repeat(mech, 1);
+    object_dynamic_tick(mech);
+}
 
 bool mechlab_find_last_player(scene *scene) {
     mechlab_local *local = scene_get_userdata(scene);
@@ -97,14 +124,11 @@ bool mechlab_find_last_player(scene *scene) {
     } else {
         log_debug("Previous savegame found; loading as default.");
         // Load HAR
-        animation *initial_har_ani = &bk_get_info(scene->bk_data, 15 + p1->chr->pilot.har_id)->ani;
+        animation *initial_har_ani = mechlab_preview_animation(scene, p1->chr->pilot.har_id);
         object_free(local->mech);
         omf_free(local->mech);
         local->mech = omf_calloc(1, sizeof(object));
-        object_create(local->mech, scene->gs, vec2i_create(0, 0), vec2f_create(0, 0));
-        object_set_animation(local->mech, initial_har_ani);
-        object_set_repeat(local->mech, 1);
-        object_dynamic_tick(local->mech);
+        mechlab_start_preview(scene, local->mech, initial_har_ani);
         sd_pilot *old_pilot = game_player_get_pilot(p1);
         if(&p1->chr->pilot != old_pilot) {
             game_player_set_pilot(p1, &p1->chr->pilot);
@@ -115,14 +139,11 @@ bool mechlab_find_last_player(scene *scene) {
 
 void mechlab_load_har(scene *scene, sd_pilot *pilot) {
     mechlab_local *local = scene_get_userdata(scene);
-    animation *initial_har_ani = &bk_get_info(scene->bk_data, 15 + pilot->har_id)->ani;
+    animation *initial_har_ani = mechlab_preview_animation(scene, pilot->har_id);
     object_free(local->mech);
     omf_free(local->mech);
     local->mech = omf_calloc(1, sizeof(object));
-    object_create(local->mech, scene->gs, vec2i_create(0, 0), vec2f_create(0, 0));
-    object_set_animation(local->mech, initial_har_ani);
-    object_set_repeat(local->mech, 1);
-    object_dynamic_tick(local->mech);
+    mechlab_start_preview(scene, local->mech, initial_har_ani);
 }
 
 void mechlab_set_selling(scene *scene, bool selling) {
@@ -192,6 +213,10 @@ void mechlab_free(scene *scene) {
     object_free(local->mech);
     component_free(local->hint);
     omf_free(local->mech);
+    if(local->grappler_preview) {
+        animation_free(local->grappler_preview);
+        omf_free(local->grappler_preview);
+    }
     omf_free(local);
     scene_set_userdata(scene, local);
 }
@@ -249,13 +274,10 @@ void mechlab_update(scene *scene) {
     mechlab_local *local = scene_get_userdata(scene);
     game_player *p1 = game_state_get_player(scene->gs, 0);
     if(p1->pilot) {
-        animation *initial_har_ani = &bk_get_info(scene->bk_data, 15 + p1->pilot->har_id)->ani;
+        animation *initial_har_ani = mechlab_preview_animation(scene, p1->pilot->har_id);
         if(local->mech && object_get_animation(local->mech) != initial_har_ani) {
             object_free(local->mech);
-            object_create(local->mech, scene->gs, vec2i_create(0, 0), vec2f_create(0, 0));
-            object_set_animation(local->mech, initial_har_ani);
-            object_set_repeat(local->mech, 1);
-            object_dynamic_tick(local->mech);
+            mechlab_start_preview(scene, local->mech, initial_har_ani);
         }
         switch(local->dashtype) {
             // Dashboard with the gauges etc.
@@ -436,11 +458,8 @@ void mechlab_select_dashboard(scene *scene, dashboard_type type) {
             object_free(local->mech);
             omf_free(local->mech);
             local->mech = omf_calloc(1, sizeof(object));
-            animation *initial_har_ani = &bk_get_info(scene->bk_data, 15 + player1->pilot->har_id)->ani;
-            object_create(local->mech, scene->gs, vec2i_create(0, 0), vec2f_create(0, 0));
-            object_set_animation(local->mech, initial_har_ani);
-            object_set_repeat(local->mech, 1);
-            object_dynamic_tick(local->mech);
+            animation *initial_har_ani = mechlab_preview_animation(scene, player1->pilot->har_id);
+            mechlab_start_preview(scene, local->mech, initial_har_ani);
 
             gui_frame_set_root(local->dashboard, lab_dash_newplayer_create(scene, &local->nw));
             gui_frame_layout(local->dashboard);

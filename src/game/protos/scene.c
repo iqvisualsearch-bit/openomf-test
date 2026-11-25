@@ -1,5 +1,6 @@
 #include "game/protos/scene.h"
 #include "formats/error.h"
+#include "formats/move.h"
 #include "game/game_player.h"
 #include "game/game_state.h"
 #include "game/game_state_type.h"
@@ -282,6 +283,7 @@ static void scene_load_mech_gief_hip_toss(af *fighter) {
     af_move *reach = omf_calloc(1, sizeof(af_move));
     reach->id = MECH_GIEF_HIP_TOSS;
     reach->category = CAT_CLOSE;
+    reach->extra_string_selector = ESS_SPECIAL_ARM;
     reach->successor_id = stock_throw->successor_id;
     reach->next_move = MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH;
     reach->throw_duration = 7;
@@ -371,6 +373,7 @@ static void scene_load_mech_gief_piledriver(af *fighter) {
 
     str_set_c(&grab->move_string, "P632");
     grab->next_move = MECH_GIEF_PILEDRIVER;
+    grab->extra_string_selector = ESS_SPECIAL_ARM;
     grab->successor_id = 35;
     grab->throw_duration = 26;
     grab->damage = (grab->damage * 115 + 50) / 100;
@@ -800,7 +803,7 @@ int scene_load_har(scene *scene, int player_id) {
     }
     scene->af_data[player_id] = omf_calloc(1, sizeof(af));
 
-    int resource_id = har_to_resource(player->pilot->har_id);
+    int resource_id = har_to_resource(game_state_team_base_har(player->pilot->har_id));
     if(load_af_file(scene->af_data[player_id], resource_id)) {
         log_error("Unable to load HAR %s (%s)!", har_get_name(player->pilot->har_id), get_resource_name(resource_id));
         return 1;

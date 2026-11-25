@@ -359,7 +359,8 @@ static void arena_end(scene *sc) {
         if(fight_stats->winner == 0) {
             int16_t hp_left_percent = har_health_percent(p1_har);
             // check if this is an unranked challenger with an enhancement we don't have
-            if(p2->pilot->rank == 0 && fight_stats->finish == FINISH_DESTRUCTION &&
+            if(p1->pilot->har_id < NUMBER_OF_HAR_TYPES && p2->pilot->rank == 0 &&
+               fight_stats->finish == FINISH_DESTRUCTION &&
                p2->pilot->enhancements[p1->pilot->har_id] == p1->pilot->enhancements[p1->pilot->har_id] + 1) {
                 p1->pilot->enhancements[p1->pilot->har_id] = p2->pilot->enhancements[p1->pilot->har_id];
                 fight_stats->plug_text = PLUG_ENHANCEMENT;
@@ -1883,7 +1884,8 @@ int arena_create(scene *scene) {
         }
 
         object_create(obj, scene->gs, pos[i], vec2f_create(0, 0));
-        if(har_create(obj, scene->af_data[i], dir[i], player->pilot->har_id, player->pilot->pilot_id, i)) {
+        if(har_create(obj, scene->af_data[i], dir[i], game_state_team_base_har(player->pilot->har_id),
+                      player->pilot->pilot_id, i)) {
             return 1;
         }
 
@@ -2000,9 +2002,10 @@ int arena_create(scene *scene) {
     // Set the name and HAR here, as they will remain static during the match. Ping will be dynamically set.
     for(int i = 0; i < 2; i++) {
         local->player_name[i] = create_text_object(str_c(&_player[i]->pilot->name));
+        const int robot = game_state_selected_robot(scene->gs, i);
         local->player_har[i] = create_text_object(
-            game_state_has_expanded_roster(scene->gs) ? game_state_team_har_name(game_state_selected_robot(scene->gs, i)) :
-                                     lang_get(_player[i]->pilot->har_id + 31));
+            game_state_has_expanded_roster(scene->gs) || robot == HAR_GRAPPLER ?
+                game_state_team_har_name(robot) : lang_get(robot + 31));
         local->player_ping[i] = create_text_object("0");
     }
 

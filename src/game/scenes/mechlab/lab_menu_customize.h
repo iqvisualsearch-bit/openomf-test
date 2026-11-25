@@ -8,5 +8,7 @@ component *lab_menu_customize_create(scene *s);
 int calculate_trade_value(sd_pilot *pilot);
 int sell_highest_value_upgrade(sd_pilot *pilot, char *sold);
 int har_price(int har_id);
+const char *har_shop_name(int har_id);
+bool har_is_trade_available(const sd_pilot *pilot, int har_id, int trade_value);
 
 #endif // LAB_MENU_CUSTOMIZE_H

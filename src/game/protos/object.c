@@ -406,12 +406,13 @@ void object_render(object *obj) {
     // Render the captured robot at the visible grip, using the lift from
     // the same rendered frame as Mech Gief. Physics coordinates remain
     // available to the throw timer, wall checks and landing recovery.
-    if(game_state_has_expanded_roster(obj->gs) && obj->group == GROUP_HAR && obj->cur_animation->id == ANIM_DAMAGE) {
+    if(obj->group == GROUP_HAR && obj->cur_animation->id == ANIM_DAMAGE) {
         const har *victim = object_get_userdata(obj);
         if(victim->throw_duration > 0) {
             const object *grabber = game_state_find_object(obj->gs, obj->animation_state.enemy_obj_id);
             if(grabber && grabber->group == GROUP_HAR && grabber->cur_animation &&
-               grabber->cur_animation->id == MECH_GIEF_PILEDRIVER && grabber->sprite_state.o_correction.y < 0) {
+               grabber->cur_animation->id == MECH_GIEF_PILEDRIVER && grabber->sprite_state.o_correction.y < 0 &&
+               game_state_selected_robot(obj->gs, ((const har *)object_get_userdata(grabber))->player_id) == TEAM_HAR_MECH_GIEF) {
                 const int grip_x = 9 * object_get_direction(grabber);
                 x = grabber->pos.x + grip_x - w / 2;
                 y = grabber->pos.y + grabber->sprite_state.o_correction.y - 50 - h / 2;
