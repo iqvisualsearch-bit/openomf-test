@@ -410,6 +410,73 @@ static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region 
     }
 }
 
+static void scene_load_shoto_normals(af *fighter) {
+    // These slots retain Jaguar's command bindings, damage and hit reactions.
+    static const struct {
+        int id;
+        const char *poses[3];
+        const char *timing;
+        mech_gief_hit_region strike;
+    } moves[SHOTO_NORMAL_COUNT] = {
+        {42, {"shoto-stand-punch-1.png", "shoto-stand-punch-2.png", "shoto-stand-punch-3.png"},
+         "A4-cps5l40sp7B4-C7", {14, -68, 42, -56}},
+        {41, {"shoto-stand-kick-1.png", "shoto-stand-kick-2.png", "shoto-stand-kick-3.png"},
+         "A6-cps5l40sp7B5-C9", {12, -70, 30, -50}},
+        {44, {"shoto-air-punch-1.png", "shoto-air-punch-2.png", "shoto-air-punch-3.png"},
+         "A4-cps5l40sp7B6-C7", {8, -56, 28, -40}},
+        {43, {"shoto-air-kick-1.png", "shoto-air-kick-2.png", "shoto-air-kick-3.png"},
+         "A5-cps5l40sp7B7-C8", {17, -53, 48, -45}},
+        {30, {"shoto-crouch-punch-1.png", "shoto-crouch-punch-2.png", "shoto-crouch-punch-3.png"},
+         "A4-cps5l40sp7B4-C7", {16, -52, 49, -42}},
+        {19, {"shoto-crouch-kick-1.png", "shoto-crouch-kick-2.png", "shoto-crouch-kick-3.png"},
+         "A7-cps5l40sp7B5-C10", {16, -22, 49, -10}},
+    };
+
+    for(int i = 0; i < SHOTO_NORMAL_COUNT; i++) {
+        af_move *move = af_get_move(fighter, moves[i].id);
+        if(!move) {
+            continue;
+        }
+        sprite *poses[3];
+        int count = 0;
+        while(count < 3 && (poses[count] = scene_load_mech_gief_pose(moves[i].poses[count])) != NULL) {
+            count++;
+        }
+        if(count != 3) {
+            for(int j = 0; j < count; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Shoto normal sprite %s unavailable.", moves[i].poses[count]);
+            continue;
+        }
+
+        animation *replacement = create_animation_from_single(poses[0], move->ani.start_pos);
+        replacement->id = move->id;
+        animation_append_sprite(replacement, poses[1]);
+        animation_append_sprite(replacement, poses[2]);
+        str_set_c(&replacement->animation_string, moves[i].timing);
+        scene_add_mech_gief_hit_region(replacement, moves[i].strike, 1);
+
+        // Keep the original surfaces alive for the base fighter's remaining animations.
+        fighter->original_shoto_normals[i] = replacement;
+        animation original = move->ani;
+        move->ani = *replacement;
+        *replacement = original;
+
+        if(move->id == 44) {
+            // The inherited directional air punches otherwise take precedence over slot 44.
+            const int alternate_air_punches[] = {15, 39};
+            for(int j = 0; j < 2; j++) {
+                af_move *alternate = af_get_move(fighter, alternate_air_punches[j]);
+                if(alternate && alternate->category == CAT_JUMPING) {
+                    str_set_c(&alternate->move_string, "!");
+                }
+            }
+        }
+    }
+}
+
 static void scene_load_shoto_pulse_shot(af *fighter) {
     static const char *const resources[] = {
         "shoto-pulse-shot-1.png",
@@ -911,6 +978,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_lariat(scene->af_data[player_id]);
     } else if(game_state_selected_robot(scene->gs, player_id) == TEAM_HAR_SHOTO) {
         scene_load_custom_idle(scene->af_data[player_id], "shoto-idle.png");
+        scene_load_shoto_normals(scene->af_data[player_id]);
         scene_load_shoto_pulse_shot(scene->af_data[player_id]);
     }
 

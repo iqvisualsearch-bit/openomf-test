@@ -18,6 +18,8 @@ enum {
 };
 enum { MECH_GIEF_HIT_STANDING, MECH_GIEF_HIT_CROUCHING, MECH_GIEF_HIT_AIRBORNE, MECH_GIEF_HIT_COUNT };
 
+enum { SHOTO_NORMAL_COUNT = 6 };
+
 typedef struct af_t {
     unsigned int id;
     int32_t endurance;
@@ -31,6 +33,7 @@ typedef struct af_t {
     animation *original_idle;
     animation *original_throw;
     animation *original_standing_attacks[2];
+    animation *original_shoto_normals[SHOTO_NORMAL_COUNT];
     animation *original_mech_gief_moves[MECH_GIEF_MOVE_COUNT];
     animation *mech_gief_flame_effect;
     animation *mech_gief_reactions[MECH_GIEF_HIT_COUNT];
