@@ -88,7 +88,7 @@ enum {
     SHOTO_BACK_AIR_PUNCH = 67,
     SHOTO_BACK_AIR_KICK = 68,
     SHOTO_PULSE_BURN = 69,
-    SHOTO_PULSE_BURN_COLOR = 253,
+    SHOTO_PULSE_BURN_COLOR = 174, // Stable blue ramp entry in the stock arenas.
 };
 
 typedef struct {

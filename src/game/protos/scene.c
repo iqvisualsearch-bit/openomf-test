@@ -410,6 +410,55 @@ static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region 
     }
 }
 
+static void scene_load_shoto_movement(af *fighter) {
+    static const struct {
+        int id;
+        int original_slot;
+        const char *name;
+        const char *timing;
+    } moves[] = {
+        {ANIM_WALKING, 3, "walk", "A7-B6-C7-D6"},
+        {ANIM_JUMPING, MECH_GIEF_JUMP_SLOT, "jump", "A3-B7-C120"},
+    };
+
+    for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {
+        af_move *move = af_get_move(fighter, moves[i].id);
+        if(!move) {
+            continue;
+        }
+        sprite *poses[4];
+        int count = 0;
+        for(; count < 4; count++) {
+            char filename[32];
+            snprintf(filename, sizeof(filename), "shoto-%s-%d.png", moves[i].name, count + 1);
+            poses[count] = scene_load_mech_gief_pose(filename);
+            if(!poses[count]) {
+                log_warn("Shoto movement sprite %s unavailable.", filename);
+                break;
+            }
+        }
+        if(count != 4) {
+            for(int j = 0; j < count; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            continue;
+        }
+        animation *replacement = create_animation_from_single(poses[0], move->ani.start_pos);
+        replacement->id = move->id;
+        for(int j = 1; j < 4; j++) {
+            animation_append_sprite(replacement, poses[j]);
+        }
+        str_set_c(&replacement->animation_string, moves[i].timing);
+
+        // Use the existing custom jump and landing path, and keep shared base surfaces alive.
+        fighter->original_mech_gief_moves[moves[i].original_slot] = replacement;
+        animation original = move->ani;
+        move->ani = *replacement;
+        *replacement = original;
+    }
+}
+
 static void scene_load_shoto_normals(af *fighter) {
     // Use Jaguar's hit reactions and damage as the baseline for Shoto's normals.
     static const struct {
@@ -1044,6 +1093,7 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_lariat(scene->af_data[player_id]);
     } else if(game_state_selected_robot(scene->gs, player_id) == TEAM_HAR_SHOTO) {
         scene_load_custom_idle(scene->af_data[player_id], "shoto-idle.png");
+        scene_load_shoto_movement(scene->af_data[player_id]);
         scene_load_shoto_normals(scene->af_data[player_id]);
         scene_load_shoto_pulse_shot(scene->af_data[player_id]);
     }

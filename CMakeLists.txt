@@ -573,6 +573,14 @@ if(USE_LIBPNG)
     set(MECH_GIEF_SPRITES
         resources/mech-gief-idle.png
         resources/shoto-idle.png
+        resources/shoto-walk-1.png
+        resources/shoto-walk-2.png
+        resources/shoto-walk-3.png
+        resources/shoto-walk-4.png
+        resources/shoto-jump-1.png
+        resources/shoto-jump-2.png
+        resources/shoto-jump-3.png
+        resources/shoto-jump-4.png
         resources/shoto-back-punch-1.png
         resources/shoto-back-punch-2.png
         resources/shoto-back-punch-3.png
