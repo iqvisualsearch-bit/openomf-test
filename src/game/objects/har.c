@@ -1409,6 +1409,10 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
        (obj_a->cur_sprite_id != 0 || object_is_airborne(obj_b) || b->is_grabbed || har_is_crouching(b))) {
         return 0;
     }
+    if(move->id == MECH_GIEF_HIP_TOSS && har_is_mech_gief(obj_a, a) &&
+       (obj_a->cur_sprite_id != 0 || object_is_airborne(obj_b) || b->is_grabbed || b->throw_duration)) {
+        return 0;
+    }
     if(har_is_scout(obj_a, a) && move->id == SCOUT_TELEPORT &&
        (b->state != STATE_STANDING || object_is_airborne(obj_b) || object_distance(obj_a, obj_b) > 32)) {
         return 0;
@@ -2445,12 +2449,13 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
     size_t len;
 
     static const int scout_specials[] = {SCOUT_TELEPORT, SCOUT_WIND_FRONTAL, SCOUT_DIVE_KICK};
-    static const int mech_gief_specials[] = {MECH_GIEF_GRAB};
+    static const int mech_gief_specials[] = {MECH_GIEF_GRAB, MECH_GIEF_HIP_TOSS};
     const bool scout = har_is_scout(obj, h);
     const int *priority_moves = scout ? scout_specials : mech_gief_specials;
     const int special_count = scout ? (int)(sizeof(scout_specials) / sizeof(scout_specials[0])) :
-                                      (har_has_piledriver(obj, h) ? 1 : 0);
-    // Match the longer Scout commands before stock attacks with a shared prefix.
+                                      (har_is_mech_gief(obj, h) ?
+                                           (int)(sizeof(mech_gief_specials) / sizeof(mech_gief_specials[0])) : 0);
+    // Give variant commands priority over stock moves with the same input.
     for(int i = ANIM_SCREW + 1 - special_count; i < MAX_AF_MOVES; i++) {
         int move_id = i <= ANIM_SCREW ? priority_moves[i - (ANIM_SCREW + 1 - special_count)] : i;
         if((move = af_get_move(h->af_data, move_id))) {

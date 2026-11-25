@@ -573,6 +573,10 @@ if(USE_LIBPNG)
     set(MECH_GIEF_SPRITES
         resources/mech-gief-idle.png
         resources/mech-gief-versus.png
+        resources/mech-gief-hip-toss-reach.png
+        resources/mech-gief-hip-toss-grab.png
+        resources/mech-gief-hip-toss-toss.png
+        resources/mech-gief-hip-toss-recover.png
         resources/mech-gief-grab.png
         resources/mech-gief-airborne-spin.png
         resources/mech-gief-slam.png

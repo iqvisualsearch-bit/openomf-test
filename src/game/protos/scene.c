@@ -252,6 +252,68 @@ static sprite *scene_rotate_mech_gief_spin(const sprite *source) {
     return pose;
 }
 
+static void scene_load_mech_gief_hip_toss(af *fighter) {
+    const af_move *stock_throw = af_get_move(fighter, MECH_GIEF_GRAB);
+    if(!stock_throw || af_get_move(fighter, MECH_GIEF_HIP_TOSS) ||
+       af_get_move(fighter, MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH)) {
+        return;
+    }
+
+    static const char *const resources[] = {
+        "mech-gief-hip-toss-reach.png",
+        "mech-gief-hip-toss-grab.png",
+        "mech-gief-hip-toss-toss.png",
+        "mech-gief-hip-toss-recover.png",
+    };
+    sprite *poses[4];
+    for(int i = 0; i < 4; i++) {
+        poses[i] = scene_load_mech_gief_pose(resources[i]);
+        if(!poses[i]) {
+            for(int j = 0; j < i; j++) {
+                sprite_free(poses[j]);
+                omf_free(poses[j]);
+            }
+            log_warn("Mech Gief hip toss sprites unavailable.");
+            return;
+        }
+    }
+
+    af_move *reach = omf_calloc(1, sizeof(af_move));
+    reach->id = MECH_GIEF_HIP_TOSS;
+    reach->category = CAT_CLOSE;
+    reach->successor_id = 28;
+    reach->next_move = MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH;
+    reach->throw_duration = 7;
+    reach->damage = stock_throw->damage * 3 / 4;
+    reach->stun = stock_throw->stun * 3 / 4;
+    reach->points = stock_throw->points;
+    str_from_c(&reach->move_string, "P6");
+    // Hold the opponent in front of the grip through the grab, then toss them away.
+    str_from_c(&reach->footer_string, "ex-27D7-vx-5y-3L6-M20");
+    animation *startup = create_animation_from_single(poses[0], stock_throw->ani.start_pos);
+    startup->id = reach->id;
+    animation_append_sprite(startup, sprite_copy(poses[3]));
+    str_set_c(&startup->animation_string, "A4-B12");
+    reach->ani = *startup;
+    omf_free(startup);
+
+    af_move *finish = omf_calloc(1, sizeof(af_move));
+    finish->id = MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH;
+    str_from_c(&finish->move_string, "!");
+    str_create(&finish->footer_string);
+    animation *followthrough = create_animation_from_single(poses[1], stock_throw->ani.start_pos);
+    followthrough->id = finish->id;
+    animation_append_sprite(followthrough, poses[2]);
+    animation_append_sprite(followthrough, poses[3]);
+    str_set_c(&followthrough->animation_string, "zzA7-s25l50sp12B5-C10");
+    finish->ani = *followthrough;
+    omf_free(followthrough);
+
+    array_set(&fighter->moves, reach->id, reach);
+    array_set(&fighter->moves, finish->id, finish);
+    fighter->sound_translation_table[25] = 70;
+}
+
 static void scene_load_mech_gief_piledriver(af *fighter) {
     af_move *grab = af_get_move(fighter, MECH_GIEF_GRAB);
     if(!grab || af_get_move(fighter, MECH_GIEF_PILEDRIVER)) {
@@ -750,6 +812,7 @@ int scene_load_har(scene *scene, int player_id) {
             str_set_c(&double_down_punch->move_string, "!");
         }
         scene_load_mech_gief_idle(scene->af_data[player_id]);
+        scene_load_mech_gief_hip_toss(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
         scene_load_mech_gief_move_animations(scene->af_data[player_id]);
