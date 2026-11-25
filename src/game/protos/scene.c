@@ -816,6 +816,12 @@ int scene_load_har(scene *scene, int player_id) {
         if(double_down_punch && str_equal_c(&double_down_punch->move_string, "P252")) {
             str_set_c(&double_down_punch->move_string, "!");
         }
+        // Let Grappler's regular airborne punch handle Down + Punch as well.
+        af_move *air_down_punch = af_get_move(scene->af_data[player_id], 34);
+        if(air_down_punch && air_down_punch->category == CAT_JUMPING &&
+           str_equal_c(&air_down_punch->move_string, "P2")) {
+            str_set_c(&air_down_punch->move_string, "!");
+        }
         scene_load_mech_gief_idle(scene->af_data[player_id]);
         scene_load_mech_gief_hip_toss(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
