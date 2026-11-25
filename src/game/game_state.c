@@ -1203,7 +1203,7 @@ int game_state_team_base_har(int robot) {
 
 const char *game_state_team_har_name(int robot) {
     if(robot == TEAM_HAR_MECH_GIEF) {
-        return "Mech Gief";
+        return "Grappler";
     }
     return robot == TEAM_HAR_SCOUT ? "Scout" : har_get_name(robot);
 }
