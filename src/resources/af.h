@@ -18,7 +18,7 @@ enum {
 };
 enum { MECH_GIEF_HIT_STANDING, MECH_GIEF_HIT_CROUCHING, MECH_GIEF_HIT_AIRBORNE, MECH_GIEF_HIT_COUNT };
 
-enum { SHOTO_NORMAL_COUNT = 6 };
+enum { SHOTO_NORMAL_COUNT = 12 };
 
 typedef struct af_t {
     unsigned int id;

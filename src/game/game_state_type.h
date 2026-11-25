@@ -83,6 +83,8 @@ enum {
     MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH = 62,
     SHOTO_PULSE_SHOT = 63,
     SHOTO_PULSE_ORB = 64,
+    SHOTO_FORWARD_KICK = 65,
+    SHOTO_FORWARD_AIR_KICK = 66,
 };
 
 typedef struct {

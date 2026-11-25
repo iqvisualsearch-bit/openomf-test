@@ -411,12 +411,14 @@ static void scene_add_mech_gief_hit_region(animation *ani, mech_gief_hit_region 
 }
 
 static void scene_load_shoto_normals(af *fighter) {
-    // These slots retain Jaguar's command bindings, damage and hit reactions.
+    // Use Jaguar's hit reactions and damage as the baseline for Shoto's normals.
     static const struct {
         int id;
         const char *poses[3];
         const char *timing;
         mech_gief_hit_region strike;
+        const char *command;
+        int template_id;
     } moves[SHOTO_NORMAL_COUNT] = {
         {42, {"shoto-stand-punch-1.png", "shoto-stand-punch-2.png", "shoto-stand-punch-3.png"},
          "A4-cps5l40sp7B4-C7", {14, -68, 42, -56}},
@@ -430,11 +432,24 @@ static void scene_load_shoto_normals(af *fighter) {
          "A4-cps5l40sp7B4-C7", {16, -52, 49, -42}},
         {19, {"shoto-crouch-kick-1.png", "shoto-crouch-kick-2.png", "shoto-crouch-kick-3.png"},
          "A7-cps5l40sp7B5-C10", {16, -22, 49, -10}},
+        {17, {"shoto-forward-punch-1.png", "shoto-forward-punch-2.png", "shoto-forward-punch-3.png"},
+         "A5-x+4cps5l40sp7B4-C9", {28, -66, 72, -54}, "P6", 0},
+        {SHOTO_FORWARD_KICK, {"shoto-forward-kick-1.png", "shoto-forward-kick-2.png", "shoto-forward-kick-3.png"},
+         "A7-x+4cps5l40sp7B5-C11", {20, -66, 40, -50}, "K6", 41},
+        {15, {"shoto-forward-air-punch-1.png", "shoto-forward-air-punch-2.png", "shoto-forward-air-punch-3.png"},
+         "A5-cps5l40sp7B6-C8", {20, -46, 38, -28}, "P9", 0},
+        {SHOTO_FORWARD_AIR_KICK, {"shoto-forward-air-kick-1.png", "shoto-forward-air-kick-2.png", "shoto-forward-air-kick-3.png"},
+         "A6-cps5l40sp7B6-C9", {23, -53, 47, -37}, "K9", 43},
+        {23, {"shoto-down-forward-punch-1.png", "shoto-down-forward-punch-2.png", "shoto-down-forward-punch-3.png"},
+         "A5-cps5l40sp7B4-C9", {22, -78, 42, -56}, "P3", 0},
+        {18, {"shoto-down-forward-kick-1.png", "shoto-down-forward-kick-2.png", "shoto-down-forward-kick-3.png"},
+         "A7-cps5l40sp7B5-C10", {24, -18, 39, -2}, "K3", 0},
     };
 
     for(int i = 0; i < SHOTO_NORMAL_COUNT; i++) {
         af_move *move = af_get_move(fighter, moves[i].id);
-        if(!move) {
+        const af_move *base = moves[i].template_id ? af_get_move(fighter, moves[i].template_id) : move;
+        if(!base) {
             continue;
         }
         sprite *poses[3];
@@ -451,27 +466,46 @@ static void scene_load_shoto_normals(af *fighter) {
             continue;
         }
 
-        animation *replacement = create_animation_from_single(poses[0], move->ani.start_pos);
-        replacement->id = move->id;
+        animation *replacement = create_animation_from_single(poses[0], base->ani.start_pos);
+        replacement->id = moves[i].id;
         animation_append_sprite(replacement, poses[1]);
         animation_append_sprite(replacement, poses[2]);
         str_set_c(&replacement->animation_string, moves[i].timing);
         scene_add_mech_gief_hit_region(replacement, moves[i].strike, 1);
 
-        // Keep the original surfaces alive for the base fighter's remaining animations.
-        fighter->original_shoto_normals[i] = replacement;
-        animation original = move->ani;
-        move->ani = *replacement;
-        *replacement = original;
+        if(move) {
+            // Other base animations can still refer to the original surfaces.
+            fighter->original_shoto_normals[i] = replacement;
+            animation original = move->ani;
+            move->ani = *replacement;
+            *replacement = original;
+        } else {
+            move = omf_calloc(1, sizeof(af_move));
+            move->id = moves[i].id;
+            move->category = base->category;
+            move->points = base->points;
+            move->damage = base->damage;
+            move->block_damage = base->block_damage;
+            move->block_stun = base->block_stun;
+            move->stun = base->stun;
+            move->extra_string_selector = base->extra_string_selector;
+            move->ani = *replacement;
+            omf_free(replacement);
+            str_create(&move->move_string);
+            str_from(&move->footer_string, &base->footer_string);
+            array_set(&fighter->moves, move->id, move);
+        }
+        if(moves[i].command) {
+            str_set_c(&move->move_string, moves[i].command);
+            move->pos_constraints = 0;
+            move->next_move = 0;
+            move->successor_id = 0;
+        }
 
         if(move->id == 44) {
-            // The inherited directional air punches otherwise take precedence over slot 44.
-            const int alternate_air_punches[] = {15, 39};
-            for(int j = 0; j < 2; j++) {
-                af_move *alternate = af_get_move(fighter, alternate_air_punches[j]);
-                if(alternate && alternate->category == CAT_JUMPING) {
-                    str_set_c(&alternate->move_string, "!");
-                }
+            af_move *stock_down_punch = af_get_move(fighter, 39);
+            if(stock_down_punch && stock_down_punch->category == CAT_JUMPING) {
+                str_set_c(&stock_down_punch->move_string, "!");
             }
         }
     }
