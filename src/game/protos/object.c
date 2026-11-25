@@ -450,6 +450,24 @@ void object_render(object *obj) {
     video_draw_full(obj->cur_surface, x, y, w, h, remap_offset, remap_rounds, obj->pal_offset, obj->pal_limit, opacity,
                     flip_mode, options);
 
+    if(obj->group == GROUP_HAR) {
+        const har *fighter = object_get_userdata(obj);
+        const int burn_ticks = fighter->p_sustain_ticks_left + fighter->p_fade_out_ticks_left;
+        if(fighter->p_pal_ref == SHOTO_PULSE_BURN_COLOR && burn_ticks > 0) {
+            const object *enemy = game_state_find_object(obj->gs, obj->animation_state.enemy_obj_id);
+            if(enemy && enemy->group == GROUP_HAR) {
+                const har *attacker = object_get_userdata(enemy);
+                af_move *effect = af_get_move(attacker->af_data, SHOTO_PULSE_BURN);
+                if(effect && game_state_selected_robot(obj->gs, attacker->player_id) == TEAM_HAR_SHOTO) {
+                    const sprite *flame = animation_get_sprite(&effect->ani, (burn_ticks / 2) % 3);
+                    const int alpha = min2(255, burn_ticks * 28);
+                    video_draw_full(flame->data, (int)obj->pos.x - 68, y + h / 2 - 60,
+                                    flame->data->render_w, flame->data->render_h, 0, 0, 0, 0, alpha, 0, 0);
+                }
+            }
+        }
+    }
+
     if(obj->group == GROUP_HAR && obj->cur_animation->id == MECH_GIEF_FLAME_BURST) {
         const har *fighter = object_get_userdata(obj);
         animation *effect = fighter->af_data->mech_gief_flame_effect;

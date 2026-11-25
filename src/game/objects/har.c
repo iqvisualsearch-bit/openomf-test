@@ -1755,11 +1755,16 @@ void har_collide_with_projectile(object *o_har, object *o_pjt) {
         disable_rehit(h, move);
 
         if(move->id == SHOTO_PULSE_ORB && game_state_selected_robot(o_pjt->gs, other->player_id) == TEAM_HAR_SHOTO) {
-        object_set_finished(o_pjt, true);
-        return;
-    }
+            sound_opts impact;
+            sound_opts_init(&impact);
+            impact.volume = 68;
+            impact.panning = clamp((hit_coord.x - 160) * 100 / 160, -100, 100);
+            game_state_play_sound(o_har->gs, 1, &impact);
+            object_set_finished(o_pjt, true);
+            return;
+        }
 
-    // Switch to successor animation if one exists for this projectile
+        // Switch to successor animation if one exists for this projectile
         // CAT CLOSE is a check for shadow grab, but there's probably a special flag
         if(move->successor_id && move->category != CAT_CLOSE) {
             af_move *next_move = af_get_move(prog_owner_af_data, move->successor_id);
@@ -2466,7 +2471,8 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
     static const int mech_gief_specials[] = {MECH_GIEF_GRAB, MECH_GIEF_HIP_TOSS};
     // Keep the inherited close throw ahead of the forward punch.
     static const int shoto_priority_moves[] = {
-        SHOTO_PULSE_SHOT, 15, SHOTO_FORWARD_AIR_KICK, 20, 17, SHOTO_FORWARD_KICK,
+        SHOTO_PULSE_SHOT, 15, SHOTO_FORWARD_AIR_KICK, SHOTO_BACK_AIR_PUNCH, SHOTO_BACK_AIR_KICK,
+        20, 17, SHOTO_FORWARD_KICK,
     };
     const bool scout = har_is_scout(obj, h);
     const bool shoto = game_state_selected_robot(obj->gs, h->player_id) == TEAM_HAR_SHOTO;
@@ -2484,8 +2490,13 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
                                              object_is_airborne(obj) &&
                                              (inputs[0] == '6' || inputs[0] == '9' ||
                                               (inputs[0] == '5' && obj->vel.x * object_get_direction(obj) > 0));
+            const bool back_jump_attack = shoto && (move_id == SHOTO_BACK_AIR_PUNCH || move_id == SHOTO_BACK_AIR_KICK) &&
+                                          object_is_airborne(obj) &&
+                                          (inputs[0] == '4' || inputs[0] == '7' ||
+                                           (inputs[0] == '5' && obj->vel.x * object_get_direction(obj) < 0));
             if((str_at(&move->move_string, 0) == prefix &&
-                (forward_jump_attack || len == 1 || !strncmp(str_c(&move->move_string) + 1, inputs, len - 1))) ||
+                (forward_jump_attack || back_jump_attack || len == 1 ||
+                 !strncmp(str_c(&move->move_string) + 1, inputs, len - 1))) ||
                (game_state_get_player(obj->gs, h->player_id)->ez_destruct &&
                 (h->state == STATE_VICTORY || h->state == STATE_SCRAP))) {
                 if(is_move_chain_allowed(obj, move)) {

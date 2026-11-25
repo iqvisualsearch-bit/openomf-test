@@ -573,6 +573,27 @@ if(USE_LIBPNG)
     set(MECH_GIEF_SPRITES
         resources/mech-gief-idle.png
         resources/shoto-idle.png
+        resources/shoto-back-punch-1.png
+        resources/shoto-back-punch-2.png
+        resources/shoto-back-punch-3.png
+        resources/shoto-back-kick-1.png
+        resources/shoto-back-kick-2.png
+        resources/shoto-back-kick-3.png
+        resources/shoto-back-air-punch-1.png
+        resources/shoto-back-air-punch-2.png
+        resources/shoto-back-air-punch-3.png
+        resources/shoto-back-air-kick-1.png
+        resources/shoto-back-air-kick-2.png
+        resources/shoto-back-air-kick-3.png
+        resources/shoto-down-back-punch-1.png
+        resources/shoto-down-back-punch-2.png
+        resources/shoto-down-back-punch-3.png
+        resources/shoto-down-back-kick-1.png
+        resources/shoto-down-back-kick-2.png
+        resources/shoto-down-back-kick-3.png
+        resources/shoto-pulse-burn-1.png
+        resources/shoto-pulse-burn-2.png
+        resources/shoto-pulse-burn-3.png
         resources/shoto-forward-punch-1.png
         resources/shoto-forward-punch-2.png
         resources/shoto-forward-punch-3.png

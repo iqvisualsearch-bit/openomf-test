@@ -444,6 +444,18 @@ static void scene_load_shoto_normals(af *fighter) {
          "A5-cps5l40sp7B4-C9", {22, -78, 42, -56}, "P3", 0},
         {18, {"shoto-down-forward-kick-1.png", "shoto-down-forward-kick-2.png", "shoto-down-forward-kick-3.png"},
          "A7-cps5l40sp7B5-C10", {24, -18, 39, -2}, "K3", 0},
+        {27, {"shoto-back-punch-1.png", "shoto-back-punch-2.png", "shoto-back-punch-3.png"},
+         "A5-cps5l40sp7B4-C8", {10, -70, 29, -53}, "P4", 0},
+        {24, {"shoto-back-kick-1.png", "shoto-back-kick-2.png", "shoto-back-kick-3.png"},
+         "A7-cps5l40sp7B5-C10", {14, -83, 30, -63}, "K4", 0},
+        {SHOTO_BACK_AIR_PUNCH, {"shoto-back-air-punch-1.png", "shoto-back-air-punch-2.png", "shoto-back-air-punch-3.png"},
+         "A5-cps5l40sp7B5-C8", {6, -62, 18, -42}, "P7", 44},
+        {SHOTO_BACK_AIR_KICK, {"shoto-back-air-kick-1.png", "shoto-back-air-kick-2.png", "shoto-back-air-kick-3.png"},
+         "A6-cps5l40sp7B6-C9", {17, -26, 34, -10}, "K7", 43},
+        {32, {"shoto-down-back-punch-1.png", "shoto-down-back-punch-2.png", "shoto-down-back-punch-3.png"},
+         "A5-cps5l40sp7B4-C8", {12, -49, 30, -35}, "P1", 0},
+        {33, {"shoto-down-back-kick-1.png", "shoto-down-back-kick-2.png", "shoto-down-back-kick-3.png"},
+         "A8-cps5l40sp7B5-C12", {25, -17, 53, -3}, "K1", 0},
     };
 
     for(int i = 0; i < SHOTO_NORMAL_COUNT; i++) {
@@ -502,6 +514,10 @@ static void scene_load_shoto_normals(af *fighter) {
             move->successor_id = 0;
         }
 
+        if(move->id == 33) {
+            // Down-back kick sweeps the opponent into a knockdown.
+            str_set_c(&move->footer_string, "sp13s2l35D1-E2-L5-M20");
+        }
         if(move->id == 44) {
             af_move *stock_down_punch = af_get_move(fighter, 39);
             if(stock_down_punch && stock_down_punch->category == CAT_JUMPING) {
@@ -520,13 +536,17 @@ static void scene_load_shoto_pulse_shot(af *fighter) {
         "shoto-pulse-orb-1.png",
         "shoto-pulse-orb-2.png",
         "shoto-pulse-orb-3.png",
+        "shoto-pulse-burn-1.png",
+        "shoto-pulse-burn-2.png",
+        "shoto-pulse-burn-3.png",
     };
-    if(af_get_move(fighter, SHOTO_PULSE_SHOT) || af_get_move(fighter, SHOTO_PULSE_ORB)) {
+    if(af_get_move(fighter, SHOTO_PULSE_SHOT) || af_get_move(fighter, SHOTO_PULSE_ORB) ||
+       af_get_move(fighter, SHOTO_PULSE_BURN)) {
         return;
     }
 
-    sprite *poses[7];
-    for(int i = 0; i < 7; i++) {
+    sprite *poses[10];
+    for(int i = 0; i < 10; i++) {
         poses[i] = scene_load_mech_gief_pose(resources[i]);
         if(!poses[i]) {
             for(int j = 0; j < i; j++) {
@@ -543,7 +563,7 @@ static void scene_load_shoto_pulse_shot(af *fighter) {
     for(int i = 1; i < 4; i++) {
         animation_append_sprite(cast, poses[i]);
     }
-    str_set_c(&cast->animation_string, "A4-B5-m64mx58my-51C4-D11");
+    str_set_c(&cast->animation_string, "A4-B5-m64mx58my-51s22l55sp10C4-D11");
 
     af_move *shot = omf_calloc(1, sizeof(af_move));
     shot->id = cast->id;
@@ -571,10 +591,22 @@ static void scene_load_shoto_pulse_shot(af *fighter) {
     orb->ani = *flight;
     omf_free(flight);
     str_from_c(&orb->move_string, "!");
-    str_from_c(&orb->footer_string, "A2-B3-C4");
+    str_from_format(&orb->footer_string, "pd%dptd1ptp5ptr13A2-B3-C4", SHOTO_PULSE_BURN_COLOR);
+
+    animation *effect = create_animation_from_single(poses[7], vec2i_create(0, 0));
+    effect->id = SHOTO_PULSE_BURN;
+    animation_append_sprite(effect, poses[8]);
+    animation_append_sprite(effect, poses[9]);
+    af_move *burn = omf_calloc(1, sizeof(af_move));
+    burn->id = effect->id;
+    burn->ani = *effect;
+    omf_free(effect);
+    str_from_c(&burn->move_string, "!");
+    str_create(&burn->footer_string);
 
     array_set(&fighter->moves, shot->id, shot);
     array_set(&fighter->moves, orb->id, orb);
+    array_set(&fighter->moves, burn->id, burn);
 }
 
 static void scene_load_mech_gief_standing_attacks(af *fighter) {
