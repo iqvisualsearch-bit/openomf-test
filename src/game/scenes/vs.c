@@ -485,9 +485,13 @@ static void vs_render(scene *scene) {
             vs_render_fight_stats(scene);
         }
     } else if(!scene->gs->team.arcade) {
-        // 1 player mode insults
-        text_draw(local->insults[0], 77, 150);
-        text_draw(local->insults[1], 110, 170);
+        // Guest pilots have no stock matchup dialogue.
+        if(local->insults[0]) {
+            text_draw(local->insults[0], 77, 150);
+        }
+        if(local->insults[1]) {
+            text_draw(local->insults[1], 110, 170);
+        }
     }
 }
 

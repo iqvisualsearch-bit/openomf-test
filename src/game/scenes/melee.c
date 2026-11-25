@@ -768,14 +768,11 @@ void handle_action(scene *scene, int player, int action) {
 }
 
 // Move cursors to select Pilot or HARs specified by A and B.
-static void restore_cursors_to(melee_local *local, unsigned a, unsigned b) {
-    // note: a/b can be HAR_NOVA (10) when returning from VS,
-    // which the original game handles surprisingly elegantly.
-    // If we try to naively do that, our pointers all explode.
-    if(a == HAR_NOVA) {
+static void restore_cursors_to(melee_local *local, unsigned a, unsigned b, bool expanded) {
+    if(!expanded && a == HAR_NOVA) {
         a = HAR_FLAIL;
     }
-    if(b == HAR_NOVA) {
+    if(!expanded && b == HAR_NOVA) {
         b = HAR_FLAIL;
     }
     local->cursor[0].column = a % 5;
@@ -829,7 +826,7 @@ void melee_input_tick(scene *scene) {
                 game_state_set_next(scene->gs, SCENE_MENU);
             } else if(local->page == HAR_SELECT) {
                 // restore the player selection
-                restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b);
+                restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b, local->extra_count == EXTRA_PILOTS);
                 local->page = PILOT_SELECT;
                 load_pilot_portraits_palette(scene);
             } else if(scene->gs->net_mode == NET_MODE_LOBBY) {
@@ -1174,7 +1171,12 @@ int melee_create(scene *scene) {
         local->page = HAR_SELECT;
         local->pilot_id_a = player1->pilot->pilot_id;
         local->pilot_id_b = player2->pilot->pilot_id;
-        restore_cursors_to(local, player1->pilot->har_id, player2->pilot->har_id);
+        if(scene->gs->team.single_player && local->pilot_id_a > PILOT_KREISSACK) {
+            // The pilot grid skips Kreissack, so guest IDs are one higher than their grid slots.
+            local->pilot_id_a--;
+        }
+        restore_cursors_to(local, game_state_selected_robot(scene->gs, 0),
+                           game_state_selected_robot(scene->gs, 1), game_state_has_expanded_roster(scene->gs));
 
         palette_load_player_colors(&player1->pilot->palette, 0);
         palette_load_player_colors(&player2->pilot->palette, 1);
@@ -1182,7 +1184,7 @@ int melee_create(scene *scene) {
         local->page = PILOT_SELECT;
         local->pilot_id_a = PILOT_CRYSTAL;
         local->pilot_id_b = PILOT_SHIRRO;
-        restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b);
+        restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b, local->extra_count == EXTRA_PILOTS);
 
         load_pilot_portraits_palette(scene);
     }
@@ -1213,7 +1215,7 @@ int melee_create(scene *scene) {
         local->team_har_labels[0] = create_green_text(54, 12, "NOVA");
         local->team_har_labels[1] = create_green_text(54, 12, "SCOUT");
     }
-    local->har_title = create_black_text(320, 6, har_get_name(CURSOR_INDEX(local, 0)));
+    local->har_title = create_black_text(320, 6, game_state_team_har_name(CURSOR_INDEX(local, 0)));
 
     // Create a black surface for the highlight box. We modify the palette in renderer.
     unsigned char *black = omf_calloc(1, 51 * 36);
