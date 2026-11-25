@@ -1170,10 +1170,10 @@ int game_state_selected_robot(game_state *gs, int player) {
     return game_state_get_player(gs, player)->pilot->har_id;
 }
 
-unsigned int game_state_single_player_win_mask(int pilot, bool include_boss) {
-    const unsigned int regulars = (2u << PILOT_KREISSACK) - 2u;
-    const unsigned int opponents = pilot < PILOT_KREISSACK ? regulars & ~(2u << pilot) : regulars;
-    return include_boss ? opponents | (2u << PILOT_KREISSACK) : opponents;
+int game_state_single_player_win_mask(int pilot, bool include_boss) {
+    const int regulars = (2 << PILOT_KREISSACK) - 2;
+    const int opponents = pilot < PILOT_KREISSACK ? regulars & ~(2 << pilot) : regulars;
+    return include_boss ? opponents | (2 << PILOT_KREISSACK) : opponents;
 }
 
 void game_state_pick_single_player_opponent(game_state *gs) {

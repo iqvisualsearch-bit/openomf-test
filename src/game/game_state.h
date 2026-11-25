@@ -23,7 +23,7 @@ bool game_state_check_assertion_is_met(rec_assertion *ass, game_state *gs);
 
 bool game_state_has_expanded_roster(const game_state *gs);
 int game_state_selected_robot(game_state *gs, int player);
-unsigned int game_state_single_player_win_mask(int pilot, bool include_boss);
+int game_state_single_player_win_mask(int pilot, bool include_boss);
 void game_state_pick_single_player_opponent(game_state *gs);
 int game_state_team_base_har(int robot);
 const char *game_state_team_har_name(int robot);
