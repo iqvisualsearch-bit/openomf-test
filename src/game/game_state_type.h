@@ -58,7 +58,7 @@ typedef struct {
 enum { TEAM_BATTLE_SIZE = 3, TEAM_ARCADE_STAGES = 5 };
 
 // Team roster entries can identify variants while the engine uses a base HAR ID.
-enum { TEAM_HAR_SCOUT = 11, TEAM_HAR_MECH_GIEF, TEAM_HAR_COUNT };
+enum { TEAM_HAR_SCOUT = 11, TEAM_HAR_MECH_GIEF, TEAM_HAR_SHOTO, TEAM_HAR_COUNT };
 enum {
     MECH_GIEF_LOW_UPPERCUT = 15,
     MECH_GIEF_HEEL_STOMP = 17,

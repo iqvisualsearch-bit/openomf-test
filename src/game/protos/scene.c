@@ -94,7 +94,7 @@ int scene_create(scene *scene, game_state *gs, int scene_id) {
     return 0;
 }
 
-static sprite *scene_create_mech_gief_idle_pose(const surface *base, int dip) {
+static sprite *scene_create_custom_idle_pose(const surface *base, int dip) {
     // Leave the feet and lower legs fixed. Compress only the upper part of
     // the sprite, keeping the same origin and palette indices across frames.
     const int fixed_y = 88;
@@ -157,6 +157,7 @@ static sprite *scene_load_mech_gief_pose_with_palette(const char *resource, cons
     surface *pixels = omf_calloc(1, sizeof(surface));
     surface_create_from_data(pixels, image.w, image.h, (const unsigned char *)image.data);
     sd_vga_image_free(&image);
+    const bool gi_only = strcmp(resource, "shoto-idle.png") == 0;
     // The stock palette reserves 16 shades per armor channel. Leave the
     // darkest outlines, visor highlights, and orange flame effects fixed.
     if(strncmp(resource, "mech-gief-flame-effect-", sizeof("mech-gief-flame-effect-") - 1) != 0) {
@@ -164,9 +165,9 @@ static sprite *scene_load_mech_gief_pose_with_palette(const char *resource, cons
         for(int color = 1; color < 256; color++) {
             if(color >= 176 && color <= 182) {
                 colors[color] = PRIMARY * 16 + 2 * (color - 176) + 2;
-            } else if(color >= 210 && color <= 221) {
+            } else if(!gi_only && color >= 210 && color <= 221) {
                 colors[color] = SECONDARY * 16 + color - 208;
-            } else if(color >= 200 && color <= 205) {
+            } else if(!gi_only && color >= 200 && color <= 205) {
                 colors[color] = TERTIARY * 16 + 2 * (color - 200) + 2;
             } else {
                 colors[color] = menu_palette ? scene_match_preview_color(source_palette.colors[color], menu_palette)
@@ -187,9 +188,9 @@ static sprite *scene_load_mech_gief_pose(const char *resource) {
     return scene_load_mech_gief_pose_with_palette(resource, NULL);
 }
 
-static void scene_set_mech_gief_idle_loop(animation *ani, const sprite *pose) {
-    animation_append_sprite(ani, scene_create_mech_gief_idle_pose(pose->data, 2));
-    animation_append_sprite(ani, scene_create_mech_gief_idle_pose(pose->data, 4));
+static void scene_set_custom_idle_loop(animation *ani, const sprite *pose) {
+    animation_append_sprite(ani, scene_create_custom_idle_pose(pose->data, 2));
+    animation_append_sprite(ani, scene_create_custom_idle_pose(pose->data, 4));
     str_set_c(&ani->animation_string, "A8-B5-C7-B5");
 }
 
@@ -206,25 +207,35 @@ animation *scene_create_mech_gief_preview(scene *sc, bool versus) {
     if(versus) {
         str_set_c(&preview->animation_string, "A1");
     } else {
-        scene_set_mech_gief_idle_loop(preview, pose);
+        scene_set_custom_idle_loop(preview, pose);
     }
     return preview;
 }
 
-static void scene_load_mech_gief_idle(af *fighter) {
+animation *scene_create_shoto_preview(scene *sc) {
+    sprite *pose = scene_load_mech_gief_pose_with_palette("shoto-idle.png", bk_get_palette(sc->bk_data, 0));
+    if(!pose) {
+        return NULL;
+    }
+    animation *preview = create_animation_from_single(pose, vec2i_create(0, 0));
+    scene_set_custom_idle_loop(preview, pose);
+    return preview;
+}
+
+static void scene_load_custom_idle(af *fighter, const char *resource) {
     af_move *idle = af_get_move(fighter, ANIM_IDLE);
     if(!idle) {
         return;
     }
-    sprite *pose = scene_load_mech_gief_pose("mech-gief-idle.png");
+    sprite *pose = scene_load_mech_gief_pose(resource);
     if(!pose) {
-        log_warn("Mech Gief idle sprite unavailable, using base animation.");
+        log_warn("Idle sprite %s unavailable, using base animation.", resource);
         return;
     }
 
     animation *replacement = create_animation_from_single(pose, idle->ani.start_pos);
     replacement->id = ANIM_IDLE;
-    scene_set_mech_gief_idle_loop(replacement, pose);
+    scene_set_custom_idle_loop(replacement, pose);
 
     // Keep the original surfaces alive for other animations that reference them.
     fighter->original_idle = replacement;
@@ -822,7 +833,7 @@ int scene_load_har(scene *scene, int player_id) {
            str_equal_c(&air_down_punch->move_string, "P2")) {
             str_set_c(&air_down_punch->move_string, "!");
         }
-        scene_load_mech_gief_idle(scene->af_data[player_id]);
+        scene_load_custom_idle(scene->af_data[player_id], "mech-gief-idle.png");
         scene_load_mech_gief_hip_toss(scene->af_data[player_id]);
         scene_load_mech_gief_piledriver(scene->af_data[player_id]);
         scene_load_mech_gief_standing_attacks(scene->af_data[player_id]);
@@ -831,6 +842,8 @@ int scene_load_har(scene *scene, int player_id) {
         scene_load_mech_gief_hit_reactions(scene->af_data[player_id]);
         scene_load_mech_gief_flame_burst(scene->af_data[player_id]);
         scene_load_mech_gief_lariat(scene->af_data[player_id]);
+    } else if(game_state_selected_robot(scene->gs, player_id) == TEAM_HAR_SHOTO) {
+        scene_load_custom_idle(scene->af_data[player_id], "shoto-idle.png");
     }
 
     log_debug("Loaded HAR %s (%s).", har_get_name(player->pilot->har_id), get_resource_name(resource_id));

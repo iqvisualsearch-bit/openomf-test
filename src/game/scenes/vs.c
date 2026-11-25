@@ -442,12 +442,14 @@ static text *create_insult_text(const char *str, int w, int h) {
     return t;
 }
 
-static void vs_set_mech_gief_preview(scene *scene, object *robot, int player) {
-    if(game_state_selected_robot(scene->gs, player) != TEAM_HAR_MECH_GIEF) {
-        return;
+static void vs_set_custom_robot_preview(scene *scene, object *robot, int player) {
+    const int selected = game_state_selected_robot(scene->gs, player);
+    animation *preview = NULL;
+    if(selected == TEAM_HAR_MECH_GIEF) {
+        preview = scene_create_mech_gief_preview(scene, true);
+    } else if(selected == TEAM_HAR_SHOTO) {
+        preview = scene_create_shoto_preview(scene);
     }
-
-    animation *preview = scene_create_mech_gief_preview(scene, true);
     if(preview) {
         object_set_animation(robot, preview);
         object_set_animation_owner(robot, OWNER_OBJECT);
@@ -611,7 +613,7 @@ int vs_create(scene *scene) {
     object_create(player1_har, scene->gs, vec2i_create(160, 0), vec2f_create(0, 0));
     object_set_animation(player1_har, ani);
     object_select_sprite(player1_har, game_state_team_base_har(player1->pilot->har_id));
-    vs_set_mech_gief_preview(scene, player1_har, 0);
+    vs_set_custom_robot_preview(scene, player1_har, 0);
     object_set_halt(player1_har, 1);
     game_state_add_object(scene->gs, player1_har, RENDER_LAYER_MIDDLE, 0, 0);
 
@@ -620,7 +622,7 @@ int vs_create(scene *scene) {
         object_create(player2_har, scene->gs, vec2i_create(160, 0), vec2f_create(0, 0));
         object_set_animation(player2_har, ani);
         object_select_sprite(player2_har, player2->pilot->har_id);
-        vs_set_mech_gief_preview(scene, player2_har, 1);
+        vs_set_custom_robot_preview(scene, player2_har, 1);
         object_set_direction(player2_har, OBJECT_FACE_LEFT);
         object_set_pal_offset(player2_har, 48);
         object_set_pal_limit(player2_har, 96);

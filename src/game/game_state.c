@@ -1188,7 +1188,7 @@ void game_state_pick_single_player_opponent(game_state *gs) {
             pilot = rand_int(PILOT_KREISSACK);
         } while(pilot == player->pilot->pilot_id || ((2u << pilot) & player->sp_wins));
         opponent->pilot->pilot_id = pilot;
-        robot = rand_int(gs->team.single_player ? TEAM_HAR_COUNT : HAR_NOVA);
+        robot = rand_int(gs->team.single_player ? TEAM_HAR_SHOTO : HAR_NOVA);
     }
     gs->team.roster[1][0] = robot;
     opponent->pilot->har_id = game_state_team_base_har(robot);
@@ -1198,12 +1198,15 @@ int game_state_team_base_har(int robot) {
     if(robot == TEAM_HAR_MECH_GIEF) {
         return HAR_NOVA;
     }
-    return robot == TEAM_HAR_SCOUT ? HAR_JAGUAR : robot;
+    return robot == TEAM_HAR_SCOUT || robot == TEAM_HAR_SHOTO ? HAR_JAGUAR : robot;
 }
 
 const char *game_state_team_har_name(int robot) {
     if(robot == TEAM_HAR_MECH_GIEF) {
         return "Grappler";
+    }
+    if(robot == TEAM_HAR_SHOTO) {
+        return "Shoto";
     }
     return robot == TEAM_HAR_SCOUT ? "Scout" : har_get_name(robot);
 }

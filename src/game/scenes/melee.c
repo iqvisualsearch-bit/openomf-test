@@ -110,6 +110,8 @@ typedef struct {
     text *wins[2];
     animation *mech_gief_preview;
     surface mech_gief_tile;
+    animation *shoto_preview;
+    surface shoto_tile;
     text *team_har_labels[TEAM_HAR_MECH_GIEF - HAR_NOVA];
     text *har_title;
     text *titles[2];
@@ -148,6 +150,11 @@ void melee_free(scene *scene) {
         surface_free(&local->mech_gief_tile);
         animation_free(local->mech_gief_preview);
         omf_free(local->mech_gief_preview);
+    }
+    if(local->shoto_preview) {
+        surface_free(&local->shoto_tile);
+        animation_free(local->shoto_preview);
+        omf_free(local->shoto_preview);
     }
 
     for(int i = 0; i < 10; i++) {
@@ -279,7 +286,8 @@ void melee_tick(scene *scene, int paused) {
     if(local->page == HAR_SELECT) {
         for(int player = 0; player < (player2->selectable ? 2 : 1); player++) {
             object *preview = &local->har[player];
-            if(preview->cur_animation == local->mech_gief_preview || local->ticks % 10 == 1) {
+            if(preview->cur_animation == local->mech_gief_preview || preview->cur_animation == local->shoto_preview ||
+               local->ticks % 10 == 1) {
                 object_dynamic_tick(preview);
             }
         }
@@ -326,9 +334,12 @@ void update_har(scene *scene, int player) {
         ani = &bk_get_info(scene->bk_data, 18 + (preview == HAR_NOVA ? HAR_JAGUAR : preview))->ani;
         if(robot == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
             ani = local->mech_gief_preview;
+        } else if(robot == TEAM_HAR_SHOTO && local->shoto_preview) {
+            ani = local->shoto_preview;
         }
-        object_set_pos(har, vec2i_create(player == 0 ? 110 : 210, ani == local->mech_gief_preview ? 98 : 95));
-        har->x_percent = har->y_percent = ani == local->mech_gief_preview ? 0.78f : 1.0f;
+        const bool custom = ani == local->mech_gief_preview || ani == local->shoto_preview;
+        object_set_pos(har, vec2i_create(player == 0 ? 110 : 210, custom ? 98 : 95));
+        har->x_percent = har->y_percent = custom ? 0.78f : 1.0f;
         object_set_animation(har, ani);
         object_select_sprite(har, 0);
         object_set_repeat(har, 1);
@@ -976,6 +987,10 @@ static void render_har_select(melee_local *local, bool player2_is_selectable, bo
                 const int player = right && !left ? 1 : 0;
                 video_draw_full(&local->mech_gief_tile, x + 1, y, 48, 26, 0, 0, player * 48,
                                 (player + 1) * 48, 255, 0, 0);
+            } else if(i == TEAM_HAR_SHOTO && local->shoto_preview) {
+                const int player = right && !left ? 1 : 0;
+                video_draw_full(&local->shoto_tile, x + 1, y, 48, 26, 0, 0, player * 48,
+                                (player + 1) * 48, 255, 0, 0);
             } else if(i < TEAM_HAR_MECH_GIEF) {
                 text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 7);
             }
@@ -1112,6 +1127,12 @@ static void load_hars(scene *scene, melee_local *local, bool player2_is_selectab
             const sprite *pose = animation_get_sprite(local->mech_gief_preview, 0);
             surface_create_from_surface(&local->mech_gief_tile, 80, 44, 28, 12, pose->data);
             surface_set_transparency(&local->mech_gief_tile, 0);
+        }
+        local->shoto_preview = scene_create_shoto_preview(scene);
+        if(local->shoto_preview) {
+            const sprite *pose = animation_get_sprite(local->shoto_preview, 0);
+            surface_create_from_surface(&local->shoto_tile, 88, 48, 20, 8, pose->data);
+            surface_set_transparency(&local->shoto_tile, 0);
         }
     }
     object_create(&local->har[0], scene->gs, vec2i_create(110, 95), vec2f_create(0, 0));
