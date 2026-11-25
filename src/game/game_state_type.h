@@ -87,6 +87,7 @@ typedef struct {
     bool active;
     bool arcade;
     bool training;
+    bool single_player;
     unsigned int stage;
     unsigned int picks;
     uint8_t roster[2][TEAM_BATTLE_SIZE];

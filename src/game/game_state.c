@@ -1159,6 +1159,41 @@ void _setup_keyboard(game_state *gs, int player_id, int control_id) {
     game_player_set_selectable(player, 1);
 }
 
+bool game_state_has_expanded_roster(const game_state *gs) {
+    return gs->team.active || gs->team.single_player;
+}
+
+int game_state_selected_robot(game_state *gs, int player) {
+    if(game_state_has_expanded_roster(gs) && gs->team.fighter[player] < TEAM_BATTLE_SIZE) {
+        return gs->team.roster[player][gs->team.fighter[player]];
+    }
+    return game_state_get_player(gs, player)->pilot->har_id;
+}
+
+unsigned int game_state_single_player_win_mask(int pilot, bool include_boss) {
+    const unsigned int regulars = (2u << PILOT_KREISSACK) - 2u;
+    const unsigned int opponents = pilot < PILOT_KREISSACK ? regulars & ~(2u << pilot) : regulars;
+    return include_boss ? opponents | (2u << PILOT_KREISSACK) : opponents;
+}
+
+void game_state_pick_single_player_opponent(game_state *gs) {
+    game_player *player = game_state_get_player(gs, 0);
+    game_player *opponent = game_state_get_player(gs, 1);
+    int robot = HAR_NOVA;
+    if(player->sp_wins == game_state_single_player_win_mask(player->pilot->pilot_id, false)) {
+        opponent->pilot->pilot_id = PILOT_KREISSACK;
+    } else {
+        int pilot;
+        do {
+            pilot = rand_int(PILOT_KREISSACK);
+        } while(pilot == player->pilot->pilot_id || ((2u << pilot) & player->sp_wins));
+        opponent->pilot->pilot_id = pilot;
+        robot = rand_int(gs->team.single_player ? TEAM_HAR_COUNT : HAR_NOVA);
+    }
+    gs->team.roster[1][0] = robot;
+    opponent->pilot->har_id = game_state_team_base_har(robot);
+}
+
 int game_state_team_base_har(int robot) {
     if(robot == TEAM_HAR_MECH_GIEF) {
         return HAR_NOVA;

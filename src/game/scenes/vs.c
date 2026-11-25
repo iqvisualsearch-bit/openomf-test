@@ -443,9 +443,7 @@ static text *create_insult_text(const char *str, int w, int h) {
 }
 
 static void vs_set_mech_gief_preview(scene *scene, object *robot, int player) {
-    const team_battle *team = &scene->gs->team;
-    if(!team->active || team->fighter[player] >= TEAM_BATTLE_SIZE ||
-       team->roster[player][team->fighter[player]] != TEAM_HAR_MECH_GIEF) {
+    if(game_state_selected_robot(scene->gs, player) != TEAM_HAR_MECH_GIEF) {
         return;
     }
 
@@ -519,7 +517,7 @@ void vs_too_pathetic_dialog_clicked(dialog *dlg, dialog_result result) {
 }
 
 static bool vs_set_team_portrait(scene *scene, object *portrait, const sd_pilot *pilot) {
-    if(!scene->gs->team.active || pilot->pilot_id <= PILOT_KREISSACK) {
+    if(!game_state_has_expanded_roster(scene->gs) || pilot->pilot_id <= PILOT_KREISSACK) {
         return false;
     }
     sprite *face = omf_calloc(1, sizeof(sprite));
@@ -731,7 +729,7 @@ int vs_create(scene *scene) {
         // tournament mode
         local->insults[0] = NULL;
         local->insults[1] = create_insult_text(str_c(&player2->pilot->quotes[0]), 150, 60);
-    } else if(player2->pilot && !scene->gs->team.active) {
+    } else if(player2->pilot && !scene->gs->team.active && player1->pilot->pilot_id <= PILOT_KREISSACK) {
         // 1 player
         local->insults[0] =
             create_insult_text(lang_get(749 + (11 * player1->pilot->pilot_id) + player2->pilot->pilot_id), 150, 30);

@@ -1702,7 +1702,7 @@ static void arena_free(scene *scene) {
             sd_rec_finish(scene->gs->rec, scene->gs->tick);
         }
 
-        if(scene->gs->init_flags->record == 1 && !scene->gs->team.active) {
+        if(scene->gs->init_flags->record == 1 && !game_state_has_expanded_roster(scene->gs)) {
             // we're supposed to save it
             sd_rec_save(scene->gs->rec, &scene->gs->init_flags->rec_file);
         }
@@ -1887,8 +1887,7 @@ int arena_create(scene *scene) {
             return 1;
         }
 
-        if(scene->gs->team.active &&
-           scene->gs->team.roster[i][scene->gs->team.fighter[i]] == TEAM_HAR_SCOUT) {
+        if(game_state_selected_robot(scene->gs, i) == TEAM_HAR_SCOUT) {
             har *fighter = object_get_userdata(obj);
             fighter->health_max = max2(1, fighter->health_max * 85 / 100);
             fighter->health = fighter->health_max;
@@ -2002,7 +2001,7 @@ int arena_create(scene *scene) {
     for(int i = 0; i < 2; i++) {
         local->player_name[i] = create_text_object(str_c(&_player[i]->pilot->name));
         local->player_har[i] = create_text_object(
-            scene->gs->team.active ? game_state_team_har_name(scene->gs->team.roster[i][scene->gs->team.fighter[i]]) :
+            game_state_has_expanded_roster(scene->gs) ? game_state_team_har_name(game_state_selected_robot(scene->gs, i)) :
                                      lang_get(_player[i]->pilot->har_id + 31));
         local->player_ping[i] = create_text_object("0");
     }

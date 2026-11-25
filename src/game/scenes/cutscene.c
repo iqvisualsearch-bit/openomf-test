@@ -26,7 +26,7 @@ static int cutscene_next_scene(scene *scene) {
     game_player *player1 = game_state_get_player(scene->gs, 0);
     switch(scene->id) {
         case SCENE_END:
-            return SCENE_END1;
+            return player1->pilot->pilot_id > PILOT_KREISSACK ? SCENE_SCOREBOARD : SCENE_END1;
         case SCENE_END1:
             return SCENE_END2;
         case SCENE_END2:

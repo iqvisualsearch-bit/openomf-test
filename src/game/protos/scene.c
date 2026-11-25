@@ -1,6 +1,7 @@
 #include "game/protos/scene.h"
 #include "formats/error.h"
 #include "game/game_player.h"
+#include "game/game_state.h"
 #include "game/game_state_type.h"
 #include "resources/af_loader.h"
 #include "resources/bk_loader.h"
@@ -805,9 +806,7 @@ int scene_load_har(scene *scene, int player_id) {
         return 1;
     }
 
-    const team_battle *team = &scene->gs->team;
-    if(team->active && team->fighter[player_id] < TEAM_BATTLE_SIZE &&
-       team->roster[player_id][team->fighter[player_id]] == TEAM_HAR_MECH_GIEF) {
+    if(game_state_selected_robot(scene->gs, player_id) == TEAM_HAR_MECH_GIEF) {
         // Nova's P252 command matches Down, neutral, Down + Punch.
         // Keep the animation data available for references, but unbind the command.
         af_move *double_down_punch = af_get_move(scene->af_data[player_id], 16);

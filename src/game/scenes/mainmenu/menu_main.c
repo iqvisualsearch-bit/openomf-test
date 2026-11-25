@@ -72,6 +72,12 @@ void mainmenu_1v2(component *c, void *userdata) {
     game_state_set_next(s->gs, SCENE_MELEE);
 }
 
+static void mainmenu_single_player(component *c, void *userdata) {
+    mainmenu_1v1(c, userdata);
+    scene *s = userdata;
+    s->gs->team = (team_battle){.single_player = true};
+}
+
 static void mainmenu_team_battle(component *c, void *userdata) {
     mainmenu_1v2(c, userdata);
     scene *s = userdata;
@@ -139,7 +145,7 @@ void mainmenu_enter_help(component *c, void *userdata) {
 
 component *menu_main_create(scene *s) {
     component *menu = menu_create();
-    menu_attach(menu, button_create("ONE PLAYER GAME", NULL, false, false, mainmenu_1v1, s));
+    menu_attach(menu, button_create("ONE PLAYER GAME", NULL, false, false, mainmenu_single_player, s));
     menu_attach(menu, button_create("TWO PLAYER GAME", NULL, false, false, mainmenu_1v2, s));
     menu_attach(menu, button_create("TEAM BATTLE", NULL, false, false, mainmenu_team_battle, s));
     menu_attach(menu, button_create("TEAM ARCADE", NULL, false, false, mainmenu_team_arcade, s));

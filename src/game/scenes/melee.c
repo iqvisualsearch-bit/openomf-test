@@ -458,7 +458,7 @@ static void load_pilot_stats(scene *scene, int player_id) {
 
     int pilot_id = player_id == 0 ? local->pilot_id_a : local->pilot_id_b;
 
-    if(local->extra_count == EXTRA_PILOTS && pilot_id >= STOCK_PILOTS) {
+    if(player->selectable && local->extra_count == EXTRA_PILOTS && pilot_id >= STOCK_PILOTS) {
         int extra = pilot_id - STOCK_PILOTS;
         player->pilot->power = extra_stats[extra][0];
         player->pilot->agility = extra_stats[extra][1];
@@ -496,7 +496,7 @@ static void load_pilot_colors(scene *scene, int player_id) {
     int pilot_id = player_id == 0 ? local->pilot_id_a : local->pilot_id_b;
 
     pilot p_a;
-    pilot_get_info(&p_a, pilot_id >= STOCK_PILOTS ? pilot_id - STOCK_PILOTS : pilot_id);
+    pilot_get_info(&p_a, player->selectable && pilot_id >= STOCK_PILOTS ? pilot_id - STOCK_PILOTS : pilot_id);
 
     // update the player palette
     sd_pilot_set_player_color(player->pilot, PRIMARY, p_a.color_1);
@@ -562,7 +562,7 @@ void handle_action(scene *scene, int player, int action) {
             break;
         case ACT_DOWN:
             if(*row == 0 || (*row == 1 && ((local->page == PILOT_SELECT && local->extra_count == EXTRA_PILOTS) ||
-                                         (local->page == HAR_SELECT && scene->gs->team.active)))) {
+                                         (local->page == HAR_SELECT && game_state_has_expanded_roster(scene->gs))))) {
                 ++*row;
                 if(*row == 2 && local->page == HAR_SELECT && *column > TEAM_HAR_COUNT - HAR_NOVA - 1) {
                     *column = TEAM_HAR_COUNT - HAR_NOVA - 1;
@@ -692,25 +692,10 @@ void handle_action(scene *scene, int player, int action) {
                         }
                         player2->pilot->pilot_id = local->pilot_id_b + (local->pilot_id_b >= STOCK_PILOTS);
                     } else if(!scene->gs->team.arcade) {
-                        if(player1->sp_wins == (2046 ^ (2 << player1->pilot->pilot_id))) {
-                            // everyone but kreissack
-                            player2->pilot->pilot_id = PILOT_KREISSACK;
-                            player2->pilot->har_id = HAR_NOVA;
-                        } else {
-                            // pick an opponent we have not yet beaten
-                            while(1) {
-                                int i = rand_int(10);
-                                if((2 << i) & player1->sp_wins || i == player1->pilot->pilot_id) {
-                                    continue;
-                                }
-                                player2->pilot->pilot_id = i;
-                                player2->pilot->har_id = rand_int(10);
-                                break;
-                            }
-                        }
+                        game_state_pick_single_player_opponent(scene->gs);
 
                         local->pilot_id_b = player2->pilot->pilot_id;
-                        load_pilot_stats(scene, player);
+                        load_pilot_stats(scene, 1);
                         load_pilot_colors(scene, 1);
                     }
                     if(!local->network_game) {
@@ -743,6 +728,10 @@ void handle_action(scene *scene, int player, int action) {
                         } else {
                             player2->pilot->har_id = game_state_team_base_har(team->roster[1][0]);
                         }
+                    }
+                    if(team->single_player) {
+                        team->roster[0][0] = player1->pilot->har_id;
+                        player1->pilot->har_id = game_state_team_base_har(team->roster[0][0]);
                     }
                     game_state_set_next(scene->gs, SCENE_VS);
                 }
@@ -1054,7 +1043,7 @@ void melee_render(scene *scene) {
     if(local->page == PILOT_SELECT) {
         render_pilot_select(local, player2->selectable);
     } else {
-        render_har_select(local, player2->selectable, scene->gs->team.active);
+        render_har_select(local, player2->selectable, game_state_has_expanded_roster(scene->gs));
     }
 
     if(scene->gs->team.arcade && local->page == HAR_SELECT) {
@@ -1120,7 +1109,7 @@ static void load_har_portraits(scene *scene, melee_local *local) {
 }
 
 static void load_hars(scene *scene, melee_local *local, bool player2_is_selectable) {
-    if(scene->gs->team.active) {
+    if(game_state_has_expanded_roster(scene->gs)) {
         local->mech_gief_preview = scene_create_mech_gief_preview(scene, false);
         if(local->mech_gief_preview) {
             const sprite *pose = animation_get_sprite(local->mech_gief_preview, 0);
@@ -1220,7 +1209,7 @@ int melee_create(scene *scene) {
     local->titles[1] = create_green_text(160, 6, lang_get(186)); // 'choose your robot'
 
     // This is used to either show the selected HAR name or both in the "X VS. Y" format.
-    if(scene->gs->team.active) {
+    if(game_state_has_expanded_roster(scene->gs)) {
         local->team_har_labels[0] = create_green_text(54, 12, "NOVA");
         local->team_har_labels[1] = create_green_text(54, 12, "SCOUT");
     }
@@ -1251,7 +1240,7 @@ int melee_create(scene *scene) {
 
     // Load HAR and Pilot face portraits and har sprites for the selection grid
     load_pilot_portraits(scene, local);
-    if(scene->gs->team.active) {
+    if(game_state_has_expanded_roster(scene->gs)) {
         load_extra_pilots(scene, local);
     }
     load_har_portraits(scene, local);

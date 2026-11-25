@@ -1379,14 +1379,11 @@ enum {
 };
 
 bool har_is_scout(const object *obj, const har *fighter) {
-    const team_battle *team = &obj->gs->team;
-    return team->active && team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_SCOUT;
+    return game_state_selected_robot(obj->gs, fighter->player_id) == TEAM_HAR_SCOUT;
 }
 
 static bool har_is_mech_gief(const object *obj, const har *fighter) {
-    const team_battle *team = &obj->gs->team;
-    return team->active && team->fighter[fighter->player_id] < TEAM_BATTLE_SIZE &&
-           team->roster[fighter->player_id][team->fighter[fighter->player_id]] == TEAM_HAR_MECH_GIEF;
+    return game_state_selected_robot(obj->gs, fighter->player_id) == TEAM_HAR_MECH_GIEF;
 }
 
 static bool har_has_piledriver(const object *obj, const har *fighter) {
