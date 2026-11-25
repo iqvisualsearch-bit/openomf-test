@@ -1131,7 +1131,7 @@ static void load_hars(scene *scene, melee_local *local, bool player2_is_selectab
         local->shoto_preview = scene_create_shoto_preview(scene);
         if(local->shoto_preview) {
             const sprite *pose = animation_get_sprite(local->shoto_preview, 0);
-            surface_create_from_surface(&local->shoto_tile, 88, 48, 20, 8, pose->data);
+            surface_create_from_surface(&local->shoto_tile, 88, 48, 20, 21, pose->data);
             surface_set_transparency(&local->shoto_tile, 0);
         }
     }
