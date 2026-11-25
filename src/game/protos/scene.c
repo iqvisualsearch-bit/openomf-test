@@ -281,7 +281,7 @@ static void scene_load_mech_gief_hip_toss(af *fighter) {
     af_move *reach = omf_calloc(1, sizeof(af_move));
     reach->id = MECH_GIEF_HIP_TOSS;
     reach->category = CAT_CLOSE;
-    reach->successor_id = 28;
+    reach->successor_id = stock_throw->successor_id;
     reach->next_move = MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH;
     reach->throw_duration = 7;
     reach->damage = stock_throw->damage * 3 / 4;
@@ -531,6 +531,9 @@ static void scene_load_mech_gief_move_animations(af *fighter) {
          {"mech-gief-hydraulic-crush-1.png", "mech-gief-hydraulic-crush-2.png",
           "mech-gief-hydraulic-crush-3.png", "mech-gief-hydraulic-crush-4.png"},
          "bm10amebex+42A1-uabeA6-beB9-bes25l50sp12C5-beD12", {{0, 0, 0, 0}}, 0, 0},
+        {ANIM_STUNNED,
+         {"mech-gief-standing-hit-flinch.png", "mech-gief-standing-hit-recoil.png", "mech-gief-standing-hit-recover.png"},
+         "A8-B9-C8-B9", {{0, 0, 0, 0}}, 0, 0},
     };
     _Static_assert(sizeof(moves) / sizeof(moves[0]) == MECH_GIEF_KNOCKDOWN_SLOT, "Mech Gief move slots");
     for(size_t i = 0; i < sizeof(moves) / sizeof(moves[0]); i++) {

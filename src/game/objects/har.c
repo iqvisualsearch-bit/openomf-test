@@ -1428,7 +1428,12 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
     }
 
     // Track this now so we don't re-evaluate after the hit registers
-    bool air_hit = object_is_airborne(obj_b) || player_frame_isset(obj_a, TAG_AI);
+    const bool target_airborne = object_is_airborne(obj_b);
+    const bool launches = player_frame_isset(obj_a, TAG_AI);
+    // Give a grounded Turning Elbow launch one follow-up under default rehit rules.
+    const bool elbow_opener = !target_airborne && move->id == MECH_GIEF_TURNING_ELBOW &&
+                              har_is_mech_gief(obj_a, a);
+    const bool air_hit = target_airborne || (launches && !elbow_opener);
 
     // if UH is set, bypass many of the collision bypass checks
     // TODO check these are the right ones
@@ -2394,6 +2399,13 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
                 if(player_frame_isset(obj, TAG_JG) || (is_har_idle_grounded(obj) && allowed_in_idle)) {
                     object *enemy_obj = game_state_find_object(
                         obj->gs, game_player_get_har_obj_id(game_state_get_player(obj->gs, !h->player_id)));
+                    const har *enemy = object_get_userdata(enemy_obj);
+                    if(move->id == MECH_GIEF_HIP_TOSS &&
+                       (object_is_airborne(enemy_obj) || enemy->throw_duration || enemy->is_grabbed ||
+                        enemy->state == STATE_STANDING_UP || enemy->state == STATE_WALLDAMAGE ||
+                        enemy->state >= STATE_VICTORY || enemy->rehit_combo)) {
+                        break;
+                    }
                     if(enemy_obj->pos.y == ARENA_FLOOR && !har_is_invincible(enemy_obj, move) &&
                        is_in_range(obj, enemy_obj, move)) {
                         allowed = true;
