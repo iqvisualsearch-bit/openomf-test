@@ -28,6 +28,7 @@
 #define IS_ZERO(n) (n < 0.8 && n > -0.8)
 
 static bool har_is_mech_gief(const object *obj, const har *fighter);
+static bool har_shoto_normal_confirmed(const object *obj, const har *fighter);
 void har_finished(object *obj);
 int har_act(object *obj, int act_type);
 void har_spawn_scrap(const object *obj, vec2i pos, int amount);
@@ -725,8 +726,10 @@ void har_move(object *obj) {
         } else if(h->state == STATE_JUMPING && enemy_har->is_grabbed == 0 && !player_frame_isset(obj, TAG_CG)) {
             // A confirmed aerial normal can use a grounded special buffered just before landing.
             const int landed_move = obj->cur_animation->id;
-            const bool air_confirm = h->hit_confirmed && h->executing_move && har_is_mech_gief(obj, h) &&
-                                     (landed_move == MECH_GIEF_BODY_PRESS || landed_move == MECH_GIEF_DROPKICK);
+            const bool grappler_confirm = h->hit_confirmed && h->executing_move && har_is_mech_gief(obj, h) &&
+                                           (landed_move == MECH_GIEF_BODY_PRESS || landed_move == MECH_GIEF_DROPKICK);
+            const bool shoto_confirm = af_get_move(h->af_data, SHOTO_PULSE_SHOT) && har_shoto_normal_confirmed(obj, h);
+            const bool air_confirm = grappler_confirm || shoto_confirm;
             if(air_confirm && (h->punch_valid || h->kick_valid)) {
                 h->state = STATE_STANDING;
                 object_set_vel(obj, vec2f_create(0, 0));
@@ -2312,6 +2315,36 @@ static void scout_configure_specials(af *data) {
     }
 }
 
+static bool har_shoto_normal_confirmed(const object *obj, const har *fighter) {
+    if(!fighter->hit_confirmed || !fighter->executing_move ||
+       game_state_selected_robot(obj->gs, fighter->player_id) != TEAM_HAR_SHOTO) {
+        return false;
+    }
+    switch(obj->cur_animation->id) {
+        case 42: // Standing punch and kick
+        case 41:
+        case 30: // Down punch and kick
+        case 19:
+        case 17: // Forward punch and kick
+        case SHOTO_FORWARD_KICK:
+        case 23: // Down-forward punch and kick
+        case 18:
+        case 27: // Back punch and kick
+        case 24:
+        case 32: // Down-back punch and kick
+        case 33:
+        case 44: // Neutral airborne punch and kick
+        case 43:
+        case 15: // Forward airborne punch and kick
+        case SHOTO_FORWARD_AIR_KICK:
+        case SHOTO_BACK_AIR_PUNCH:
+        case SHOTO_BACK_AIR_KICK:
+            return true;
+        default:
+            return false;
+    }
+}
+
 static bool har_can_cancel_mech_gief_normal(const object *obj, const har *h, int move_id) {
     if(!h->hit_confirmed || !h->executing_move || object_is_airborne(obj)) {
         return false;
@@ -2382,6 +2415,8 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
     // check if the current frame allows chaining
     bool allowed = false;
     if((allowed_in_idle && har_can_cancel_mech_gief_normal(obj, h, move->id)) ||
+       (allowed_in_idle && move->id == SHOTO_PULSE_SHOT && !object_is_airborne(obj) &&
+        har_shoto_normal_confirmed(obj, h)) ||
        (player_frame_isset(obj, TAG_JN) && move->id == player_frame_get(obj, TAG_JN))) {
         allowed = true;
     } else {
