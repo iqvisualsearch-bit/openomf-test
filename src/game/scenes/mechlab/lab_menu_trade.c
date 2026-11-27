@@ -12,6 +12,7 @@
 #include "utils/allocator.h"
 #include "utils/c_string_util.h"
 #include "utils/log.h"
+#include "utils/miscmath.h"
 
 void lab_menu_trade_done(component *menu, component *submenu) {
     scene *s = trnmenu_get_userdata(submenu);
@@ -29,6 +30,9 @@ bool confirm_trade(component *c, void *userdata) {
     game_player *p1 = game_state_get_player(s->gs, 0);
     int trade_value = calculate_trade_value(&p1->chr->pilot);
     int har_value = har_price(p1->pilot->har_id);
+    if(har_value > trade_value + p1->chr->pilot.money) {
+        return false;
+    }
     p1->chr->pilot.money += trade_value - har_value;
     p1->chr->pilot.har_id = p1->pilot->har_id;
     p1->chr->pilot.leg_speed = 0;
@@ -61,18 +65,18 @@ void lab_menu_trade(component *c, void *userdata) {
     int trade_value = calculate_trade_value(&p1->chr->pilot);
     int har_value = har_price(p1->pilot->har_id);
     if(trade_value == har_value) {
-        unsafe_snprintf(tmp, 100, lang_get(520), lang_get(31 + p1->chr->pilot.har_id),
-                        lang_get(31 + p1->pilot->har_id));
+        unsafe_snprintf(tmp, 100, lang_get(520), har_shop_name(p1->chr->pilot.har_id),
+                        har_shop_name(p1->pilot->har_id));
     } else if(trade_value > har_value) {
         char price[15];
         snprintf(price, 15, "$ %dK", trade_value - har_value);
-        unsafe_snprintf(tmp, 100, lang_get(518), lang_get(31 + p1->chr->pilot.har_id), lang_get(31 + p1->pilot->har_id),
+        unsafe_snprintf(tmp, 100, lang_get(518), har_shop_name(p1->chr->pilot.har_id), har_shop_name(p1->pilot->har_id),
                         price);
-    } else if(trade_value + p1->pilot->money > har_value) {
+    } else if(trade_value + p1->pilot->money >= har_value) {
         char price[15];
         snprintf(price, 15, "$ %dK", har_value - trade_value);
-        unsafe_snprintf(tmp, 100, lang_get(519), lang_get(31 + p1->chr->pilot.har_id), price,
-                        lang_get(31 + p1->pilot->har_id));
+        unsafe_snprintf(tmp, 100, lang_get(519), har_shop_name(p1->chr->pilot.har_id), price,
+                        har_shop_name(p1->pilot->har_id));
     }
 
     component *menu = lab_menu_confirm_create(s, confirm_trade, s, cancel_trade, s, tmp);
@@ -192,6 +196,14 @@ void lab_menu_trade_for_nova_focus(component *c, bool focused, void *userdata) {
     }
 }
 
+static void lab_menu_trade_for_grappler_focus(component *c, bool focused, void *userdata) {
+    if(focused) {
+        scene *s = userdata;
+        game_state_get_player(s->gs, 0)->pilot->har_id = HAR_GRAPPLER;
+        mechlab_update(s);
+    }
+}
+
 static const button_details details_list[] = {
     {lab_menu_trade, NULL, TEXT_ROW_HORIZONTAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, {2, 0, 0, 0}, false},
     {lab_menu_trade, NULL, TEXT_ROW_HORIZONTAL, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, {2, 0, 0, 0}, false},
@@ -233,9 +245,10 @@ component *lab_menu_trade_create(scene *s) {
     // Initialize menu, and set button sheet
     component *menu = trnmenu_create(NULL, x, y, false);
 
+    const int trade_value = calculate_trade_value(&p1->chr->pilot);
     // Init GUI buttons with locations from the "select" button sprites
-    for(int i = 0; i < animation_get_sprite_count(main_buttons); i++) {
-        if(i == p1->pilot->har_id || 0 == ((p1->pilot->har_trades >> i) & 1)) {
+    for(int i = 0; i < NUMBER_OF_HAR_TYPES && i < animation_get_sprite_count(main_buttons); i++) {
+        if(!har_is_trade_available(&p1->chr->pilot, i, trade_value)) {
             log_debug("skipping har %d (trades %u)", i, p1->pilot->har_trades);
             continue;
         }
@@ -252,6 +265,17 @@ component *lab_menu_trade_create(scene *s) {
         spritebutton_set_focus_cb(button, focus_cbs[i]);
         spritebutton_set_always_display(button);
 
+        trnmenu_attach(menu, button);
+    }
+
+    if(har_is_trade_available(&p1->chr->pilot, HAR_GRAPPLER, trade_value)) {
+        const sprite *tile = animation_get_sprite(main_buttons, HAR_NOVA);
+        component *button = spritebutton_create("GRAPPLER", tile->data, false, lab_menu_trade, s);
+        component_set_natural_size(button, max2(52, tile->data->w), tile->data->h);
+        spritebutton_set_font(button, FONT_SMALL);
+        spritebutton_set_always_display(button);
+        spritebutton_set_focus_cb(button, lab_menu_trade_for_grappler_focus);
+        component_set_pos_hints(button, x + tile->pos.x, y + tile->pos.y);
         trnmenu_attach(menu, button);
     }
 

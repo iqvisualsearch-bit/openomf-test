@@ -55,6 +55,15 @@ int calculate_trade_value(sd_pilot *pilot) {
     return trade_value * 0.85;
 }
 
+const char *har_shop_name(int har_id) {
+    return har_id == HAR_GRAPPLER ? "Grappler" : lang_get(31 + har_id);
+}
+
+bool har_is_trade_available(const sd_pilot *pilot, int har_id, int trade_value) {
+    return har_id >= 0 && (har_id < NUMBER_OF_HAR_TYPES || har_id == HAR_GRAPPLER) && har_id != pilot->har_id &&
+           ((pilot->har_trades >> har_id) & 1) && har_price(har_id) <= trade_value + pilot->money;
+}
+
 int har_price(int har_id) {
     return har_prices[har_id];
 }
@@ -315,12 +324,8 @@ void lab_menu_customize_check_trade_robot(component *c, void *userdata) {
 
     int trade_value = calculate_trade_value(p1->pilot);
     bool trades = false;
-    for(int i = 0; i < 11; i++) {
-        if(i == p1->pilot->har_id) {
-            // don't trade for the current HAR
-            continue;
-        }
-        if((p1->pilot->har_trades >> i) & 1 && har_prices[i] < trade_value + p1->pilot->money) {
+    for(int i = 0; i <= HAR_GRAPPLER; i++) {
+        if(har_is_trade_available(p1->pilot, i, trade_value)) {
             trades = true;
         }
     }
@@ -624,12 +629,8 @@ void lab_menu_focus_trade(component *c, bool focused, void *userdata) {
         uint8_t trades[5];
         memset(trades, 0, sizeof(trades));
         uint8_t tradecount = 0;
-        for(int i = 0; i < 11; i++) {
-            if(i == p1->pilot->har_id) {
-                // don't trade for the current HAR
-                continue;
-            }
-            if((p1->pilot->har_trades >> i) & 1 && har_prices[i] < trade_value + p1->pilot->money) {
+        for(int i = 0; i <= HAR_GRAPPLER && tradecount < sizeof(trades); i++) {
+            if(har_is_trade_available(p1->pilot, i, trade_value)) {
                 trades[tradecount] = i;
                 tradecount++;
             }
@@ -645,18 +646,18 @@ void lab_menu_focus_trade(component *c, bool focused, void *userdata) {
             // pick 5 of however many we got
             // naturally, I unrolled this loop for performance
             if(tradecount == 1) {
-                snprintf(tmp, 200, "%s", lang_get(31 + trades[0]));
+                snprintf(tmp, 200, "%s", har_shop_name(trades[0]));
             } else if(tradecount == 2) {
-                snprintf(tmp, 200, "%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]));
+                snprintf(tmp, 200, "%s\n%s", har_shop_name(trades[0]), har_shop_name(trades[1]));
             } else if(tradecount == 3) {
-                snprintf(tmp, 200, "%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
-                         lang_get(31 + trades[2]));
+                snprintf(tmp, 200, "%s\n%s\n%s", har_shop_name(trades[0]), har_shop_name(trades[1]),
+                         har_shop_name(trades[2]));
             } else if(tradecount == 4) {
-                snprintf(tmp, 200, "%s\n%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
-                         lang_get(31 + trades[2]), lang_get(31 + trades[3]));
+                snprintf(tmp, 200, "%s\n%s\n%s\n%s", har_shop_name(trades[0]), har_shop_name(trades[1]),
+                         har_shop_name(trades[2]), har_shop_name(trades[3]));
             } else if(tradecount == 5) {
-                snprintf(tmp, 200, "%s\n%s\n%s\n%s\n%s", lang_get(31 + trades[0]), lang_get(31 + trades[1]),
-                         lang_get(31 + trades[2]), lang_get(31 + trades[3]), lang_get(31 + trades[4]));
+                snprintf(tmp, 200, "%s\n%s\n%s\n%s\n%s", har_shop_name(trades[0]), har_shop_name(trades[1]),
+                         har_shop_name(trades[2]), har_shop_name(trades[3]), har_shop_name(trades[4]));
             }
             label_set_text(details_label, tmp);
         }
@@ -687,7 +688,7 @@ static void lab_menu_har_picture_tick(component *current_picture, void *userdata
     scene *s = userdata;
     game_player *p1 = game_state_get_player(s->gs, 0);
     animation *correct_picture = &bk_get_info(s->bk_data, 5)->ani;
-    const sprite *correct_sprite = animation_get_sprite(correct_picture, p1->pilot->har_id);
+    const sprite *correct_sprite = animation_get_sprite(correct_picture, game_state_team_base_har(p1->pilot->har_id));
     if(spritebutton_get_img(current_picture)->guid != correct_sprite->data->guid) {
         spritebutton_set_img(current_picture, correct_sprite->data);
         component_set_pos_hints(current_picture, correct_sprite->pos.x, correct_sprite->pos.y);
@@ -718,7 +719,7 @@ component *lab_menu_customize_create(scene *s) {
     }
 
     game_player *p1 = game_state_get_player(s->gs, 0);
-    const sprite *bsprite = animation_get_sprite(har_picture, p1->pilot->har_id);
+    const sprite *bsprite = animation_get_sprite(har_picture, game_state_team_base_har(p1->pilot->har_id));
     component *button = spritebutton_create(NULL, bsprite->data, false, NULL, s);
     component_set_pos_hints(button, bsprite->pos.x, bsprite->pos.y);
     component_set_selectable(button, false);

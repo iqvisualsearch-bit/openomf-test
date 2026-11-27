@@ -74,6 +74,7 @@ enum
     HAR_CHRONOS,
     HAR_NOVA,
     NUMBER_OF_HAR_TYPES,
+    HAR_GRAPPLER = 12, // Modded tournament save ID.
 };
 
 enum

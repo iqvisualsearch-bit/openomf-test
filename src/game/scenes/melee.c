@@ -3,6 +3,11 @@
 
 #include "audio/audio.h"
 #include "formats/pilot.h"
+#include "formats/bk.h"
+#include "formats/error.h"
+#include "formats/pic.h"
+#include "formats/tournament.h"
+#include "resources/resource_files.h"
 #include "game/audio/music_tracker.h"
 #include "game/game_state.h"
 #include "game/gui/menu_background.h"
@@ -24,6 +29,8 @@
 #include "video/video.h"
 
 #define MAX_STAT 20
+#define EXTRA_PILOTS 5
+#define STOCK_PILOTS 10
 #define TEXT_GREEN 0xA6
 #define TEXT_SHADOW_GREEN 0xA2
 #define TEXT_BLACK 0xD1
@@ -79,6 +86,11 @@ typedef struct {
     object unselected_har_portraits;
 
     portrait pilot_portraits[10];
+    sprite extra_portraits[EXTRA_PILOTS];
+    char extra_names[EXTRA_PILOTS][64];
+    unsigned int extra_photo_ids[EXTRA_PILOTS];
+    int extra_sex[EXTRA_PILOTS];
+    unsigned int extra_count;
     portrait har_portraits[10];
 
     object har[2];
@@ -96,6 +108,11 @@ typedef struct {
     unsigned int tickbase[2];
 
     text *wins[2];
+    animation *mech_gief_preview;
+    surface mech_gief_tile;
+    animation *shoto_preview;
+    surface shoto_tile;
+    text *team_har_labels[TEAM_HAR_MECH_GIEF - HAR_NOVA];
     text *har_title;
     text *titles[2];
     text *player_name[2];
@@ -129,6 +146,16 @@ void melee_free(scene *scene) {
 
     object_free(&local->har[0]);
     object_free(&local->har[1]);
+    if(local->mech_gief_preview) {
+        surface_free(&local->mech_gief_tile);
+        animation_free(local->mech_gief_preview);
+        omf_free(local->mech_gief_preview);
+    }
+    if(local->shoto_preview) {
+        surface_free(&local->shoto_tile);
+        animation_free(local->shoto_preview);
+        omf_free(local->shoto_preview);
+    }
 
     for(int i = 0; i < 10; i++) {
         surface_free(&local->har_portraits[i].enabled);
@@ -147,7 +174,13 @@ void melee_free(scene *scene) {
         text_free(&local->player_stats[i]);
     }
     text_free(&local->har_title);
+    for(int i = 0; i < TEAM_HAR_MECH_GIEF - HAR_NOVA; i++) {
+        text_free(&local->team_har_labels[i]);
+    }
 
+    for(unsigned int i = 0; i < local->extra_count; i++) {
+        sprite_free(&local->extra_portraits[i]);
+    }
     object_free(&local->player2_placeholder);
     object_free(&local->unselected_pilot_portraits);
     object_free(&local->unselected_har_portraits);
@@ -250,10 +283,13 @@ void melee_tick(scene *scene, int paused) {
         } while((i = i->next) != NULL);
     }
 
-    if(local->page == HAR_SELECT && local->ticks % 10 == 1) {
-        object_dynamic_tick(&local->har[0]);
-        if(player2->selectable) {
-            object_dynamic_tick(&local->har[1]);
+    if(local->page == HAR_SELECT) {
+        for(int player = 0; player < (player2->selectable ? 2 : 1); player++) {
+            object *preview = &local->har[player];
+            if(preview->cur_animation == local->mech_gief_preview || preview->cur_animation == local->shoto_preview ||
+               local->ticks % 10 == 1) {
+                object_dynamic_tick(preview);
+            }
         }
     }
 
@@ -292,18 +328,29 @@ void update_har(scene *scene, int player) {
         animation *ani;
         object *har = &local->har[player];
 
-        ani = &bk_get_info(scene->bk_data, 18 + CURSOR_INDEX(local, player))->ani;
+        int robot = CURSOR_INDEX(local, player);
+        int preview = game_state_team_base_har(robot);
+        // The stock melee file contains ten animated robot previews.
+        ani = &bk_get_info(scene->bk_data, 18 + (preview == HAR_NOVA ? HAR_JAGUAR : preview))->ani;
+        if(robot == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
+            ani = local->mech_gief_preview;
+        } else if(robot == TEAM_HAR_SHOTO && local->shoto_preview) {
+            ani = local->shoto_preview;
+        }
+        const bool custom = ani == local->mech_gief_preview || ani == local->shoto_preview;
+        object_set_pos(har, vec2i_create(player == 0 ? 110 : 210, custom ? 98 : 95));
+        har->x_percent = har->y_percent = custom ? 0.78f : 1.0f;
         object_set_animation(har, ani);
         object_select_sprite(har, 0);
         object_set_repeat(har, 1);
         if(player2->selectable) {
             str tmp;
-            str_from_format(&tmp, "%s VS. %s", har_get_name(CURSOR_INDEX(local, 0)),
-                            har_get_name(CURSOR_INDEX(local, 1)));
+            str_from_format(&tmp, "%s VS. %s", game_state_team_har_name(CURSOR_INDEX(local, 0)),
+                            game_state_team_har_name(CURSOR_INDEX(local, 1)));
             text_set_from_str(local->har_title, &tmp);
             str_free(&tmp);
         } else {
-            text_set_from_c(local->har_title, har_get_name(CURSOR_INDEX(local, 0)));
+            text_set_from_c(local->har_title, game_state_team_har_name(CURSOR_INDEX(local, 0)));
         }
     }
 }
@@ -317,12 +364,123 @@ static void reset_cursor_blinky(melee_local *local, int player) {
     }
 }
 
+static const uint8_t extra_stats[EXTRA_PILOTS][3] = {
+    {15, 8, 12}, {8, 16, 11}, {11, 10, 14}, {13, 14, 8}, {10, 12, 13},
+};
+
+static bool pilot_portrait_from_world(sprite *out, const sd_pic_photo *photo, const vga_palette *source,
+                                      const vga_palette *target) {
+    if(!photo || !photo->has_photo || !photo->sprite || !photo->sprite->len) {
+        return false;
+    }
+    sd_vga_image image;
+    if(sd_sprite_vga_decode(&image, photo->sprite) != SD_SUCCESS) {
+        return false;
+    }
+
+    // Preserve transparent index 0 and avoid the slots used for player and cursor colors.
+    uint8_t color_map[256] = {0};
+    for(int i = 1; i < 256; i++) {
+        vga_color color = i < 48 ? photo->pal.colors[i] : source->colors[i];
+        int best = 3 * 255 * 255 + 1;
+        for(int j = 96; j < 246; j++) {
+            vga_color candidate = target->colors[j];
+            int r = color.r - candidate.r;
+            int g = color.g - candidate.g;
+            int b = color.b - candidate.b;
+            int distance = r * r + g * g + b * b;
+            if(distance < best) {
+                best = distance;
+                color_map[i] = j;
+            }
+        }
+    }
+    for(size_t i = 0; i < (size_t)image.w * image.h; i++) {
+        image.data[i] = color_map[(uint8_t)image.data[i]];
+    }
+    out->data = omf_calloc(1, sizeof(surface));
+    out->owned = true;
+    surface_create_from_data(out->data, image.w, image.h, (const unsigned char *)image.data);
+    sd_vga_image_free(&image);
+    return true;
+}
+
+static bool load_world_portrait_files(sd_pic_file *pic, sd_bk_file *portrait_bk) {
+    path pic_path = get_resource_filename("WORLD.PIC");
+    // Tournament portraits use the MechLab palette, even for the World tournament.
+    path palette_path = get_resource_filename("MECHLAB.BK");
+    sd_pic_create(pic);
+    sd_bk_create(portrait_bk);
+    return sd_pic_load(pic, &pic_path) == SD_SUCCESS && sd_bk_load(portrait_bk, &palette_path) == SD_SUCCESS &&
+           portrait_bk->palette_count > 0;
+}
+
+bool melee_load_world_portrait(scene *scene, sprite *out, unsigned int photo_id) {
+    sd_pic_file pic;
+    sd_bk_file portrait_bk;
+    bool loaded = load_world_portrait_files(&pic, &portrait_bk) &&
+                  pilot_portrait_from_world(out, sd_pic_get(&pic, photo_id), portrait_bk.palettes[0],
+                                            bk_get_palette(scene->bk_data, 0));
+    sd_bk_free(&portrait_bk);
+    sd_pic_free(&pic);
+    return loaded;
+}
+
+static void load_extra_pilots(scene *scene, melee_local *local) {
+    sd_pic_file pic;
+    sd_bk_file portrait_bk;
+    sd_tournament_file tournament;
+    sd_tournament_create(&tournament);
+    path path_to_tournament = get_resource_filename("WORLD.TRN");
+    if(load_world_portrait_files(&pic, &portrait_bk) && sd_tournament_load(&tournament, &path_to_tournament) == SD_SUCCESS) {
+        bool used[MAX_PIC_PHOTOS] = {false};
+        for(unsigned int i = 0; i < tournament.enemy_count && local->extra_count < EXTRA_PILOTS; i++) {
+            const sd_pilot *pilot = tournament.enemies[i];
+            unsigned int photo_id = pilot->photo_id;
+            const sd_pic_photo *photo = sd_pic_get(&pic, photo_id);
+            unsigned int slot = local->extra_count;
+            if(photo_id >= MAX_PIC_PHOTOS || used[photo_id] || str_size(&pilot->name) == 0 ||
+               !pilot_portrait_from_world(&local->extra_portraits[slot], photo,
+                                          portrait_bk.palettes[0], bk_get_palette(scene->bk_data, 0))) {
+                continue;
+            }
+            used[photo_id] = true;
+            snprintf(local->extra_names[slot], sizeof(local->extra_names[slot]), "%s", str_c(&pilot->name));
+            local->extra_photo_ids[slot] = photo_id;
+            local->extra_sex[slot] = photo->sex;
+            local->extra_count++;
+        }
+        sd_tournament_free(&tournament);
+    }
+    sd_bk_free(&portrait_bk);
+    sd_pic_free(&pic);
+}
+
+static const char *selection_pilot_name(const melee_local *local, int pilot_id) {
+    if(local->extra_count == EXTRA_PILOTS && pilot_id >= STOCK_PILOTS) {
+        return local->extra_names[pilot_id - STOCK_PILOTS];
+    }
+    return lang_get(20 + pilot_id);
+}
+
 static void load_pilot_stats(scene *scene, int player_id) {
     game_player *player = game_state_get_player(scene->gs, player_id);
     melee_local *local = scene_get_userdata(scene);
 
     int pilot_id = player_id == 0 ? local->pilot_id_a : local->pilot_id_b;
 
+    if(player->selectable && local->extra_count == EXTRA_PILOTS && pilot_id >= STOCK_PILOTS) {
+        int extra = pilot_id - STOCK_PILOTS;
+        player->pilot->power = extra_stats[extra][0];
+        player->pilot->agility = extra_stats[extra][1];
+        player->pilot->endurance_level = extra_stats[extra][2];
+        player->pilot->photo_id = local->extra_photo_ids[extra];
+        player->pilot->sex = local->extra_sex[extra];
+        text_set_from_c(local->player_name[player_id], selection_pilot_name(local, pilot_id));
+        text_set_from_c(local->player_bio[player_id], "WORLD CHAMPIONSHIP PILOT");
+        refresh_pilot_stats(scene, player_id);
+        return;
+    }
     pilot p_a;
     pilot_get_info(&p_a, pilot_id);
 
@@ -349,7 +507,7 @@ static void load_pilot_colors(scene *scene, int player_id) {
     int pilot_id = player_id == 0 ? local->pilot_id_a : local->pilot_id_b;
 
     pilot p_a;
-    pilot_get_info(&p_a, pilot_id);
+    pilot_get_info(&p_a, player->selectable && pilot_id >= STOCK_PILOTS ? pilot_id - STOCK_PILOTS : pilot_id);
 
     // update the player palette
     sd_pilot_set_player_color(player->pilot, PRIMARY, p_a.color_1);
@@ -359,6 +517,10 @@ static void load_pilot_colors(scene *scene, int player_id) {
 }
 
 void handle_action(scene *scene, int player, int action) {
+    unsigned int roster_size = scene->gs->team.training ? 1 : TEAM_BATTLE_SIZE;
+    if(scene->gs->team.active && scene->gs->team.picks == roster_size) {
+        return;
+    }
     game_player *player1 = game_state_get_player(scene->gs, 0);
     game_player *player2 = game_state_get_player(scene->gs, 1);
     melee_local *local = scene_get_userdata(scene);
@@ -388,11 +550,14 @@ void handle_action(scene *scene, int player, int action) {
                     local->cheat_pilot_stats[player] |= *row + 1;
                 }
             }
+            if(*row == 2 && local->page == HAR_SELECT && *column > TEAM_HAR_COUNT - HAR_NOVA - 1) {
+                *column = TEAM_HAR_COUNT - HAR_NOVA - 1;
+            }
             reset_cursor_blinky(local, player);
             break;
         case ACT_RIGHT:
             (*column)++;
-            if(*column > 4) {
+            if(*column > (*row == 2 && local->page == HAR_SELECT ? TEAM_HAR_COUNT - HAR_NOVA - 1 : 4)) {
                 *column = 0;
                 if(local->page == PILOT_SELECT) {
                     local->cheat_pilot_stats[player] |= *row + 1;
@@ -401,14 +566,18 @@ void handle_action(scene *scene, int player, int action) {
             reset_cursor_blinky(local, player);
             break;
         case ACT_UP:
-            if(*row == 1) {
-                *row = 0;
+            if(*row > 0) {
+                --*row;
             }
             reset_cursor_blinky(local, player);
             break;
         case ACT_DOWN:
-            if(*row == 0) {
-                *row = 1;
+            if(*row == 0 || (*row == 1 && ((local->page == PILOT_SELECT && local->extra_count == EXTRA_PILOTS) ||
+                                         (local->page == HAR_SELECT && game_state_has_expanded_roster(scene->gs))))) {
+                ++*row;
+                if(*row == 2 && local->page == HAR_SELECT && *column > TEAM_HAR_COUNT - HAR_NOVA - 1) {
+                    *column = TEAM_HAR_COUNT - HAR_NOVA - 1;
+                }
             }
             reset_cursor_blinky(local, player);
             // nova selection cheat
@@ -474,22 +643,40 @@ void handle_action(scene *scene, int player, int action) {
             }
             // FALLTHRU
         case ACT_PUNCH:
+            if(local->page == HAR_SELECT && scene->gs->team.active) {
+                team_battle *team = &scene->gs->team;
+                int robot = CURSOR_INDEX(local, player);
+                if(CURSOR_NOVA_SELECT(local, player) && local->katana_down_count[player] >= 11 &&
+                   !memchr(local->cheat_selected[player], 0, sizeof(local->cheat_selected[player]))) {
+                    robot = HAR_NOVA;
+                }
+                for(unsigned int i = 0; i < team->picks; i++) {
+                    if(team->roster[player][i] == robot) {
+                        return;
+                    }
+                }
+            }
             *done = 1;
             audio_play_sound_simple(20, 0);
             if(CURSOR_A_DONE(local) && (CURSOR_B_DONE(local) || !player2->selectable)) {
                 local->cursor[0].done = 0;
                 local->cursor[1].done = 0;
                 if(local->page == PILOT_SELECT) {
-                    local->page = HAR_SELECT;
-                    update_har(scene, 0);
-                    update_har(scene, 1);
                     local->pilot_id_a = CURSOR_INDEX(local, 0);
                     local->pilot_id_b = CURSOR_INDEX(local, 1);
+                    local->page = HAR_SELECT;
+                    for(int i = 0; i < 2; i++) {
+                        if(local->cursor[i].row == 2) {
+                            local->cursor[i].row = 0;
+                        }
+                    }
+                    update_har(scene, 0);
+                    update_har(scene, 1);
 
                     // prepare for nova selection cheat
                     memset(local->cheat_selected, 0, sizeof(local->cheat_selected));
-                    local->cheat_selected[0][local->pilot_id_a] = 1;
-                    local->cheat_selected[1][local->pilot_id_b] = 1;
+                    local->cheat_selected[0][local->pilot_id_a % STOCK_PILOTS] = 1;
+                    local->cheat_selected[1][local->pilot_id_b % STOCK_PILOTS] = 1;
 
                     load_pilot_colors(scene, 0);
 
@@ -507,39 +694,55 @@ void handle_action(scene *scene, int player, int action) {
                     } else {
                         player1->pilot->har_id = CURSOR_INDEX(local, 0);
                     }
-                    player1->pilot->pilot_id = local->pilot_id_a;
+                    player1->pilot->pilot_id = local->pilot_id_a + (local->pilot_id_a >= STOCK_PILOTS);
                     if(player2->selectable) {
                         if(nova_activated[1] && CURSOR_NOVA_SELECT(local, 1)) {
                             player2->pilot->har_id = HAR_NOVA;
                         } else {
                             player2->pilot->har_id = CURSOR_INDEX(local, 1);
                         }
-                        player2->pilot->pilot_id = local->pilot_id_b;
-                    } else {
-                        if(player1->sp_wins == (2046 ^ (2 << player1->pilot->pilot_id))) {
-                            // everyone but kreissack
-                            player2->pilot->pilot_id = PILOT_KREISSACK;
-                            player2->pilot->har_id = HAR_NOVA;
-                        } else {
-                            // pick an opponent we have not yet beaten
-                            while(1) {
-                                int i = rand_int(10);
-                                if((2 << i) & player1->sp_wins || i == player1->pilot->pilot_id) {
-                                    continue;
-                                }
-                                player2->pilot->pilot_id = i;
-                                player2->pilot->har_id = rand_int(10);
-                                break;
-                            }
-                        }
+                        player2->pilot->pilot_id = local->pilot_id_b + (local->pilot_id_b >= STOCK_PILOTS);
+                    } else if(!scene->gs->team.arcade) {
+                        game_state_pick_single_player_opponent(scene->gs);
 
                         local->pilot_id_b = player2->pilot->pilot_id;
-                        load_pilot_stats(scene, player);
+                        load_pilot_stats(scene, 1);
                         load_pilot_colors(scene, 1);
                     }
                     if(!local->network_game) {
-                        str_set_c(&player1->pilot->name, lang_get(player1->pilot->pilot_id + 20));
-                        str_set_c(&player2->pilot->name, lang_get(player2->pilot->pilot_id + 20));
+                        str_set_c(&player1->pilot->name, selection_pilot_name(local, local->pilot_id_a));
+                        if(!scene->gs->team.arcade) {
+                            const char *opponent = player2->selectable ? selection_pilot_name(local, local->pilot_id_b) :
+                                                                        lang_get(player2->pilot->pilot_id + 20);
+                            str_set_c(&player2->pilot->name, opponent);
+                        }
+                    }
+                    team_battle *team = &scene->gs->team;
+                    if(team->active) {
+                        team->roster[0][team->picks] = player1->pilot->har_id;
+                        if(!team->arcade) {
+                            team->roster[1][team->picks] = player2->pilot->har_id;
+                        }
+                        team->picks++;
+                        if(team->picks < roster_size) {
+                            char label[32];
+                            snprintf(label, sizeof(label), "Pick robot %u of %d", team->picks + 1, TEAM_BATTLE_SIZE);
+                            text_set_from_c(local->wins[0], label);
+                            if(player2->selectable) {
+                                text_set_from_c(local->wins[1], label);
+                            }
+                            break;
+                        }
+                        player1->pilot->har_id = game_state_team_base_har(team->roster[0][0]);
+                        if(team->arcade) {
+                            game_state_start_team_arcade_stage(scene->gs);
+                        } else {
+                            player2->pilot->har_id = game_state_team_base_har(team->roster[1][0]);
+                        }
+                    }
+                    if(team->single_player) {
+                        team->roster[0][0] = player1->pilot->har_id;
+                        player1->pilot->har_id = game_state_team_base_har(team->roster[0][0]);
                     }
                     game_state_set_next(scene->gs, SCENE_VS);
                 }
@@ -570,18 +773,17 @@ void handle_action(scene *scene, int player, int action) {
     refresh_pilot_stats(local);
 #endif
 
-    local->cheat_selected[player][5 * (*row) + *column] = 1;
+    if(*row < 2) {
+        local->cheat_selected[player][5 * (*row) + *column] = 1;
+    }
 }
 
 // Move cursors to select Pilot or HARs specified by A and B.
-static void restore_cursors_to(melee_local *local, unsigned a, unsigned b) {
-    // note: a/b can be HAR_NOVA (10) when returning from VS,
-    // which the original game handles surprisingly elegantly.
-    // If we try to naively do that, our pointers all explode.
-    if(a == HAR_NOVA) {
+static void restore_cursors_to(melee_local *local, unsigned a, unsigned b, bool expanded) {
+    if(!expanded && a == HAR_NOVA) {
         a = HAR_FLAIL;
     }
-    if(b == HAR_NOVA) {
+    if(!expanded && b == HAR_NOVA) {
         b = HAR_FLAIL;
     }
     local->cursor[0].column = a % 5;
@@ -598,12 +800,15 @@ void melee_input_tick(scene *scene) {
     game_player *player2 = game_state_get_player(scene->gs, 1);
     ctrl_event *p1 = NULL, *p2 = NULL, *i;
     controller_poll(player1->ctrl, &p1);
-    controller_poll(player2->ctrl, &p2);
+    if(!scene->gs->team.training) {
+        controller_poll(player2->ctrl, &p2);
+    }
     i = p1;
     if(i) {
         do {
             if(i->type == EVENT_TYPE_ACTION) {
-                handle_action(scene, 0, i->event_data.action);
+                int side = scene->gs->team.training && CURSOR_A_DONE(local) ? 1 : 0;
+                handle_action(scene, side, i->event_data.action);
             } else if(i->type == EVENT_TYPE_CLOSE) {
                 game_state_set_next(scene->gs, SCENE_MENU);
             }
@@ -628,9 +833,11 @@ void melee_input_tick(scene *scene) {
     for(i = menu_ev; i; i = i->next) {
         if(i->type == EVENT_TYPE_ACTION && i->event_data.action == ACT_ESC) {
             audio_play_sound_simple(20, 0);
-            if(local->page == HAR_SELECT) {
+            if(scene->gs->team.active) {
+                game_state_set_next(scene->gs, SCENE_MENU);
+            } else if(local->page == HAR_SELECT) {
                 // restore the player selection
-                restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b);
+                restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b, local->extra_count == EXTRA_PILOTS);
                 local->page = PILOT_SELECT;
                 load_pilot_portraits_palette(scene);
             } else if(scene->gs->net_mode == NET_MODE_LOBBY) {
@@ -725,6 +932,30 @@ static void render_pilot_select(melee_local *local, bool player2_is_selectable) 
         text_draw(local->titles[0], 160, 97);
     }
 
+    if(local->extra_count == EXTRA_PILOTS) {
+        for(int i = 0; i < STOCK_PILOTS + EXTRA_PILOTS; i++) {
+            int x = 14 + (i % 5) * 62;
+            int y = 113 + (i / 5) * 28;
+            bool left = CURSOR_INDEX(local, 0) == i;
+            bool right = player2_is_selectable && CURSOR_INDEX(local, 1) == i;
+            if(left || right) {
+                int color = left && right ? VIOLET_CURSOR_INDEX : left ? RED_CURSOR_INDEX : BLUE_CURSOR_INDEX;
+                video_draw_full(&local->select_hilight, x - 2, y - 1, 54, 28, 0, 0, color, 255, 255, 0, 0);
+            }
+            const surface *face = i < STOCK_PILOTS ? &local->pilot_portraits[i].enabled :
+                                                  local->extra_portraits[i - STOCK_PILOTS].data;
+            video_draw_size(face, x, y, 50, 26);
+        }
+        for(int player = 0; player < (player2_is_selectable ? 2 : 1); player++) {
+            int selected = CURSOR_INDEX(local, player);
+            if(selected < STOCK_PILOTS) {
+                object_render(player == 0 ? &local->big_portrait_1 : &local->big_portrait_2);
+            } else {
+                video_draw_size(local->extra_portraits[selected - STOCK_PILOTS].data, player == 0 ? 3 : 255, 0, 62, 50);
+            }
+        }
+        return;
+    }
     object_render(&local->unselected_pilot_portraits);
     render_highlights(local, player2_is_selectable);
     render_enabled_portrait(local->pilot_portraits, &local->cursor[0], -1);
@@ -735,20 +966,54 @@ static void render_pilot_select(melee_local *local, bool player2_is_selectable) 
     }
 }
 
-static void render_har_select(melee_local *local, bool player2_is_selectable) {
+static void render_har_select(melee_local *local, bool player2_is_selectable, bool team_active) {
     object_render(&local->player2_placeholder);
 
     // render the stupid unselected HAR portraits before anything
     // so we can render anything else on top of them
-    object_render(&local->unselected_har_portraits);
-    render_highlights(local, player2_is_selectable);
+    if(team_active) {
+        for(int i = 0; i < TEAM_HAR_COUNT; i++) {
+            int x = 14 + (i % 5) * 62;
+            int y = 113 + (i / 5) * 28;
+            bool left = CURSOR_INDEX(local, 0) == i;
+            bool right = player2_is_selectable && CURSOR_INDEX(local, 1) == i;
+            if(left || right) {
+                int color = left && right ? VIOLET_CURSOR_INDEX : left ? RED_CURSOR_INDEX : BLUE_CURSOR_INDEX;
+                video_draw_full(&local->select_hilight, x - 2, y - 1, 54, 28, 0, 0, color, 255, 255, 0, 0);
+            }
+            if(i < HAR_NOVA) {
+                video_draw_size(&local->har_portraits[i].enabled, x, y, 50, 26);
+            } else if(i == TEAM_HAR_MECH_GIEF && local->mech_gief_preview) {
+                const int player = right && !left ? 1 : 0;
+                video_draw_full(&local->mech_gief_tile, x + 1, y, 48, 26, 0, 0, player * 48,
+                                (player + 1) * 48, 255, 0, 0);
+            } else if(i == TEAM_HAR_SHOTO && local->shoto_preview) {
+                const int player = right && !left ? 1 : 0;
+                video_draw_full(&local->shoto_tile, x + 1, y, 48, 26, 0, 0, player * 48,
+                                (player + 1) * 48, 255, 0, 0);
+            } else if(i < TEAM_HAR_MECH_GIEF) {
+                text_draw(local->team_har_labels[i - HAR_NOVA], x - 2, y + 7);
+            }
+        }
+    } else {
+        object_render(&local->unselected_har_portraits);
+        render_highlights(local, player2_is_selectable);
+    }
 
     // currently selected player
-    object_render(&local->big_portrait_1);
+    if(local->pilot_id_a >= STOCK_PILOTS && local->extra_count == EXTRA_PILOTS) {
+        video_draw_size(local->extra_portraits[local->pilot_id_a - STOCK_PILOTS].data, 3, 0, 62, 50);
+    } else {
+        object_render(&local->big_portrait_1);
+    }
 
     // currently selected HAR
-    render_enabled_portrait(local->har_portraits, &local->cursor[0], 0);
-    object_render(&local->har[0]);
+    if(!team_active) {
+        render_enabled_portrait(local->har_portraits, &local->cursor[0], 0);
+    }
+    if(CURSOR_INDEX(local, 0) != HAR_NOVA) {
+        object_render(&local->har[0]);
+    }
 
     // player 1 name
     text_draw(local->player_name[0], 0, 52);
@@ -758,11 +1023,19 @@ static void render_har_select(melee_local *local, bool player2_is_selectable) {
         text_draw(local->player_name[1], 320 - 66, 52);
 
         // currently selected player
-        object_render(&local->big_portrait_2);
+        if(local->pilot_id_b >= STOCK_PILOTS && local->extra_count == EXTRA_PILOTS) {
+            video_draw_size(local->extra_portraits[local->pilot_id_b - STOCK_PILOTS].data, 255, 0, 62, 50);
+        } else {
+            object_render(&local->big_portrait_2);
+        }
 
         // currently selected HAR
-        render_enabled_portrait(local->har_portraits, &local->cursor[1], 1);
-        object_render(&local->har[1]);
+        if(!team_active) {
+            render_enabled_portrait(local->har_portraits, &local->cursor[1], 1);
+        }
+        if(CURSOR_INDEX(local, 1) != HAR_NOVA) {
+            object_render(&local->har[1]);
+        }
 
         // render HAR name (Har1 VS. Har2)
         text_draw(local->har_title, 0, 107);
@@ -782,10 +1055,13 @@ void melee_render(scene *scene) {
     if(local->page == PILOT_SELECT) {
         render_pilot_select(local, player2->selectable);
     } else {
-        render_har_select(local, player2->selectable);
+        render_har_select(local, player2->selectable, game_state_has_expanded_roster(scene->gs));
     }
 
-    if(player2->selectable) {
+    if(scene->gs->team.arcade && local->page == HAR_SELECT) {
+        text_draw(local->wins[0], 8, 107);
+    }
+    if(player2->selectable && (!scene->gs->team.active || local->page == HAR_SELECT)) {
         text_draw(local->wins[0], 8, 107);
         text_draw(local->wins[1], 160, 107);
     }
@@ -845,6 +1121,20 @@ static void load_har_portraits(scene *scene, melee_local *local) {
 }
 
 static void load_hars(scene *scene, melee_local *local, bool player2_is_selectable) {
+    if(game_state_has_expanded_roster(scene->gs)) {
+        local->mech_gief_preview = scene_create_mech_gief_preview(scene, false);
+        if(local->mech_gief_preview) {
+            const sprite *pose = animation_get_sprite(local->mech_gief_preview, 0);
+            surface_create_from_surface(&local->mech_gief_tile, 80, 44, 28, 12, pose->data);
+            surface_set_transparency(&local->mech_gief_tile, 0);
+        }
+        local->shoto_preview = scene_create_shoto_preview(scene);
+        if(local->shoto_preview) {
+            const sprite *pose = animation_get_sprite(local->shoto_preview, 0);
+            surface_create_from_surface(&local->shoto_tile, 88, 48, 20, 21, pose->data);
+            surface_set_transparency(&local->shoto_tile, 0);
+        }
+    }
     object_create(&local->har[0], scene->gs, vec2i_create(110, 95), vec2f_create(0, 0));
     update_har(scene, 0);
     if(player2_is_selectable) {
@@ -902,7 +1192,12 @@ int melee_create(scene *scene) {
         local->page = HAR_SELECT;
         local->pilot_id_a = player1->pilot->pilot_id;
         local->pilot_id_b = player2->pilot->pilot_id;
-        restore_cursors_to(local, player1->pilot->har_id, player2->pilot->har_id);
+        if(scene->gs->team.single_player && local->pilot_id_a > PILOT_KREISSACK) {
+            // The pilot grid skips Kreissack, so guest IDs are one higher than their grid slots.
+            local->pilot_id_a--;
+        }
+        restore_cursors_to(local, game_state_selected_robot(scene->gs, 0),
+                           game_state_selected_robot(scene->gs, 1), game_state_has_expanded_roster(scene->gs));
 
         palette_load_player_colors(&player1->pilot->palette, 0);
         palette_load_player_colors(&player2->pilot->palette, 1);
@@ -910,7 +1205,7 @@ int melee_create(scene *scene) {
         local->page = PILOT_SELECT;
         local->pilot_id_a = PILOT_CRYSTAL;
         local->pilot_id_b = PILOT_SHIRRO;
-        restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b);
+        restore_cursors_to(local, local->pilot_id_a, local->pilot_id_b, local->extra_count == EXTRA_PILOTS);
 
         load_pilot_portraits_palette(scene);
     }
@@ -937,7 +1232,11 @@ int melee_create(scene *scene) {
     local->titles[1] = create_green_text(160, 6, lang_get(186)); // 'choose your robot'
 
     // This is used to either show the selected HAR name or both in the "X VS. Y" format.
-    local->har_title = create_black_text(320, 6, har_get_name(CURSOR_INDEX(local, 0)));
+    if(game_state_has_expanded_roster(scene->gs)) {
+        local->team_har_labels[0] = create_green_text(54, 12, "NOVA");
+        local->team_har_labels[1] = create_green_text(54, 12, "SCOUT");
+    }
+    local->har_title = create_black_text(320, 6, game_state_team_har_name(CURSOR_INDEX(local, 0)));
 
     // Create a black surface for the highlight box. We modify the palette in renderer.
     unsigned char *black = omf_calloc(1, 51 * 36);
@@ -964,6 +1263,9 @@ int melee_create(scene *scene) {
 
     // Load HAR and Pilot face portraits and har sprites for the selection grid
     load_pilot_portraits(scene, local);
+    if(game_state_has_expanded_roster(scene->gs)) {
+        load_extra_pilots(scene, local);
+    }
     load_har_portraits(scene, local);
     load_hars(scene, local, player2->selectable);
 
@@ -973,15 +1275,29 @@ int melee_create(scene *scene) {
     object_set_animation(&local->big_portrait_1, pilot_big_portraits);
     object_select_sprite(&local->big_portrait_1, 0);
 
+    if(scene->gs->team.arcade) {
+        local->wins[0] = create_black_text(152, 6, "Pick robot 1 of 3");
+        text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
+    }
     if(player2->selectable) {
         chr_score *s1 = game_player_get_score(game_state_get_player(scene->gs, 0));
         chr_score *s2 = game_player_get_score(game_state_get_player(scene->gs, 1));
 
         char tmp[64];
-        snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
+        if(scene->gs->team.training) {
+            snprintf(tmp, sizeof(tmp), "Your robot");
+        } else if(scene->gs->team.active) {
+            snprintf(tmp, sizeof(tmp), "Pick robot 1 of %d", TEAM_BATTLE_SIZE);
+        } else {
+            snprintf(tmp, sizeof(tmp), "Wins: %d", s1->wins);
+        }
         local->wins[0] = create_black_text(160 - 8, 6, tmp);
         text_set_horizontal_align(local->wins[0], TEXT_ALIGN_LEFT);
-        snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
+        if(scene->gs->team.training) {
+            snprintf(tmp, sizeof(tmp), "Dummy robot");
+        } else if(!scene->gs->team.active) {
+            snprintf(tmp, sizeof(tmp), "Wins: %d", s2->wins);
+        }
         local->wins[1] = create_black_text(160 - 8, 6, tmp);
         text_set_horizontal_align(local->wins[1], TEXT_ALIGN_RIGHT);
 

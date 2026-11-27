@@ -1,3 +1,5 @@
+#include <ctype.h>
+
 #include "game/scenes/newsroom.h"
 #include "game/audio/music_tracker.h"
 #include "game/gui/dialog.h"
@@ -120,8 +122,10 @@ void newsroom_fixup_str(newsroom_local *local) {
     str_replace(&tmp, "~7", pronoun_strip(object_pronoun(local->sex1), scratch, sizeof scratch), -1);
     str_replace(&tmp, "~6", pronoun_strip(possessive_pronoun(local->sex1), scratch, sizeof scratch), -1);
     str_replace(&tmp, "~5", "Stadium", -1);
-    str_replace(&tmp, "~4", pronoun_strip(lang_get(local->har2 + LANG_STR_HAR), scratch, sizeof scratch), -1);
-    str_replace(&tmp, "~3", pronoun_strip(lang_get(local->har1 + LANG_STR_HAR), scratch, sizeof scratch), -1);
+    str_replace(&tmp, "~4", local->har2 >= TEAM_HAR_SCOUT ? game_state_team_har_name(local->har2) :
+                    pronoun_strip(lang_get(local->har2 + LANG_STR_HAR), scratch, sizeof scratch), -1);
+    str_replace(&tmp, "~3", local->har1 >= TEAM_HAR_SCOUT ? game_state_team_har_name(local->har1) :
+                    pronoun_strip(lang_get(local->har1 + LANG_STR_HAR), scratch, sizeof scratch), -1);
     str_replace(&tmp, "~2", str_c(&local->pilot2), -1);
     str_replace(&tmp, "~1", str_c(&local->pilot1), -1);
 
@@ -274,26 +278,11 @@ void newsroom_input_tick(scene *scene) {
                                 p2->sp_wins = 0;
                             } else {
                                 log_debug("wins are %d", p1->sp_wins);
-                                if(p1->sp_wins == (4094 ^ (2 << p1->pilot->pilot_id))) {
+                                if(p1->sp_wins == game_state_single_player_win_mask(p1->pilot->pilot_id, true)) {
                                     // won the game
                                     game_state_set_next(scene->gs, SCENE_END);
                                 } else {
-                                    if(p1->sp_wins == (2046 ^ (2 << p1->pilot->pilot_id))) {
-                                        // everyone but kreissack
-                                        p2->pilot->pilot_id = PILOT_KREISSACK;
-                                        p2->pilot->har_id = HAR_NOVA;
-                                    } else {
-                                        // pick an opponent we have not yet beaten
-                                        while(1) {
-                                            int i = rand_int(10);
-                                            if((2 << i) & p1->sp_wins || i == p1->pilot->pilot_id) {
-                                                continue;
-                                            }
-                                            p2->pilot->pilot_id = i;
-                                            p2->pilot->har_id = rand_int(10);
-                                            break;
-                                        }
-                                    }
+                                    game_state_pick_single_player_opponent(scene->gs);
                                     pilot p;
                                     pilot_get_info(&p, p2->pilot->pilot_id);
                                     p2->pilot->endurance_level = p.endurance_level;
@@ -317,7 +306,7 @@ void newsroom_input_tick(scene *scene) {
                             }
                             if(p1->chr && local->champion) {
                                 game_state_set_next(scene->gs, SCENE_TRN_CUTSCENE);
-                            } else {
+                            } else if(scene->gs->next_id != SCENE_END) {
                                 game_state_set_next(scene->gs, SCENE_VS);
                             }
                         } else {
@@ -479,8 +468,8 @@ int newsroom_create(scene *scene) {
     // p2 pilot must be set by now
     assert(p2->pilot != NULL);
 
-    newsroom_set_names(local, str_c(&p1->pilot->name), str_c(&p2->pilot->name), p1->pilot->har_id, p2->pilot->har_id,
-                       p1->pilot->sex, p2->pilot->sex);
+    newsroom_set_names(local, str_c(&p1->pilot->name), str_c(&p2->pilot->name),
+                       game_state_selected_robot(scene->gs, 0), game_state_selected_robot(scene->gs, 1), p1->pilot->sex, p2->pilot->sex);
     newsroom_fixup_str(local);
 
     // Continue Dialog

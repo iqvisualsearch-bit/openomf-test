@@ -76,7 +76,7 @@ int intersect(const object *obj, const object *target, vec2i *point, bool is_har
     // Some useful variables
     sprite *cur_sprite = animation_get_sprite(obj->cur_animation, obj->cur_sprite_id);
     sprite *target_sprite = animation_get_sprite(target->cur_animation, target->cur_sprite_id);
-    if(target_sprite == NULL) {
+    if(target_sprite == NULL || target_sprite->data == NULL) {
         return 0;
     }
     vec2i pos_a = vec2i_add(object_get_pos(obj), cur_sprite->pos);
@@ -127,18 +127,15 @@ int intersect(const object *obj, const object *target, vec2i *point, bool is_har
             continue;
         }
 
-        // Get hitpixel
-        surface *sfc = target_sprite->data;
-        int hitpoint = (ycoord * sfc->w) + xcoord;
-        if(target_dir == OBJECT_FACE_LEFT) {
-            hitpoint = (ycoord * sfc->w) + (sfc->w - xcoord);
-        }
-        // Data bounds check
-        if(hitpoint >= sfc->w * sfc->h) {
+        const surface *sfc = target_sprite->data;
+        const int pixel_x = target_dir == OBJECT_FACE_LEFT ? sfc->w - 1 - xcoord : xcoord;
+        if(pixel_x < 0 || pixel_x >= sfc->w || ycoord >= sfc->h) {
             continue;
         }
-        // Only main HAR colors count
-        if(sfc->data[hitpoint] != sfc->transparent && (sfc->data[hitpoint] < 96 || !is_har)) {
+        const unsigned char pixel = sfc->data[ycoord * sfc->w + pixel_x];
+        // Stock HAR palettes mark vulnerable pixels below 96. Custom sprites
+        // can opt in to using their opaque silhouette as the hurtbox.
+        if(pixel != sfc->transparent && (!is_har || target_sprite->hit_all_opaque_pixels || pixel < 96)) {
             hcoords[found++] = vec2i_create(xcoord, ycoord);
         }
         if(found > 0) {

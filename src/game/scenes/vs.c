@@ -6,6 +6,7 @@
 #include "game/gui/text/text.h"
 #include "game/protos/scene.h"
 #include "game/scenes/mechlab/lab_menu_customize.h"
+#include "game/scenes/melee.h"
 #include "game/utils/formatting.h"
 #include "game/utils/settings.h"
 #include "resources/languages.h"
@@ -268,11 +269,13 @@ void vs_input_tick(scene *scene) {
                 dialog_event(&local->too_pathetic_dialog, i->event_data.action, i->source);
             } else if(dialog_is_visible(&local->quit_dialog)) {
                 dialog_event(&local->quit_dialog, i->event_data.action, i->source);
-            } else if(vs_is_singleplayer(scene) && player1->sp_wins != 0 && !player1->chr) {
+            } else if(!scene->gs->team.active && vs_is_singleplayer(scene) && player1->sp_wins != 0 && !player1->chr) {
                 // there's an active singleplayer campaign, confirm quitting
                 dialog_show(&local->quit_dialog, 1);
             } else {
-                if(player1->chr) {
+                if(scene->gs->team.active) {
+                    game_state_set_next(scene->gs, SCENE_MENU);
+                } else if(player1->chr) {
                     // Match cancelled, no winner
                     scene->gs->fight_stats.winner = -1;
                     // null out the  p2 pilot
@@ -439,6 +442,24 @@ static text *create_insult_text(const char *str, int w, int h) {
     return t;
 }
 
+static void vs_set_custom_robot_preview(scene *scene, object *robot, int player) {
+    const int selected = game_state_selected_robot(scene->gs, player);
+    animation *preview = NULL;
+    if(selected == TEAM_HAR_MECH_GIEF) {
+        preview = scene_create_mech_gief_preview(scene, true);
+    } else if(selected == TEAM_HAR_SHOTO) {
+        preview = scene_create_shoto_preview(scene);
+    }
+    if(preview) {
+        object_set_animation(robot, preview);
+        object_set_animation_owner(robot, OWNER_OBJECT);
+        object_select_sprite(robot, 0);
+        // Keep the feet above the arena panel at y=150.
+        object_set_pos(robot, vec2i_create(player == 0 ? 80 : 240, 148));
+        robot->x_percent = robot->y_percent = 1.25f;
+    }
+}
+
 static void vs_render(scene *scene) {
     vs_local *local = scene_get_userdata(scene);
     game_player *player1 = game_state_get_player(scene->gs, 0);
@@ -465,10 +486,14 @@ static void vs_render(scene *scene) {
         if(scene->gs->fight_stats.winner >= 0) {
             vs_render_fight_stats(scene);
         }
-    } else {
-        // 1 player mode insults
-        text_draw(local->insults[0], 77, 150);
-        text_draw(local->insults[1], 110, 170);
+    } else if(!scene->gs->team.arcade) {
+        // Guest pilots have no stock matchup dialogue.
+        if(local->insults[0]) {
+            text_draw(local->insults[0], 77, 150);
+        }
+        if(local->insults[1]) {
+            text_draw(local->insults[1], 110, 170);
+        }
     }
 }
 
@@ -497,6 +522,22 @@ void vs_too_pathetic_dialog_clicked(dialog *dlg, dialog_result result) {
     game_state_set_next(sc->gs, SCENE_SCOREBOARD);
 }
 
+static bool vs_set_team_portrait(scene *scene, object *portrait, const sd_pilot *pilot) {
+    if(!game_state_has_expanded_roster(scene->gs) || pilot->pilot_id <= PILOT_KREISSACK) {
+        return false;
+    }
+    sprite *face = omf_calloc(1, sizeof(sprite));
+    if(!melee_load_world_portrait(scene, face, pilot->photo_id)) {
+        omf_free(face);
+        return false;
+    }
+    object_set_sprite_override(portrait, 1);
+    object_set_animation(portrait, create_animation_from_single(face, vec2i_create(0, -face->data->h)));
+    object_set_animation_owner(portrait, OWNER_OBJECT);
+    portrait->cur_sprite_id = 0;
+    return true;
+}
+
 int vs_create(scene *scene) {
     // Initialize Demo
     if(is_demoplay(scene->gs)) {
@@ -516,7 +557,7 @@ int vs_create(scene *scene) {
         // and your money
         // TODO figure out how this really works, but this'll do for now
         int trade_value = calculate_trade_value(player1->pilot);
-        int8_t trades[10];
+        int8_t trades[NUMBER_OF_HAR_TYPES];
         memset(trades, -1, sizeof(trades));
         uint8_t tradecount = 0;
 
@@ -533,9 +574,12 @@ int vs_create(scene *scene) {
             }
         }
 
-        // choose 5 random ones and pack them into the bitmask
-        uint16_t new_trades = 0;
-        for(int i = 0; i < min2(5, tradecount);) {
+        // Reserve one offer for Grappler when the player can afford the trade.
+        const bool offer_grappler = player1->pilot->har_id != HAR_GRAPPLER &&
+                                    har_price(HAR_GRAPPLER) <= trade_value + player1->pilot->money;
+        uint32_t new_trades = offer_grappler ? (1u << HAR_GRAPPLER) : 0;
+        const int stock_offers = offer_grappler ? 4 : 5;
+        for(int i = 0; i < min2(stock_offers, tradecount);) {
             uint8_t choice = rand_int(tradecount);
             if(trades[choice] != -1) {
                 new_trades |= 1 << trades[choice];
@@ -547,7 +591,12 @@ int vs_create(scene *scene) {
         player1->pilot->har_trades = new_trades;
     } else {
         char title[128];
-        snprintf(title, 128, "%s VS. %s", str_c(&player1->pilot->name), str_c(&player2->pilot->name));
+        if(scene->gs->team.arcade) {
+            snprintf(title, sizeof(title), "STAGE %u/%d: %s VS. %s", scene->gs->team.stage + 1, TEAM_ARCADE_STAGES,
+                     str_c(&player1->pilot->name), str_c(&player2->pilot->name));
+        } else {
+            snprintf(title, sizeof(title), "%s VS. %s", str_c(&player1->pilot->name), str_c(&player2->pilot->name));
+        }
         local->vs_text = create_vs_text(title);
     }
 
@@ -563,7 +612,8 @@ int vs_create(scene *scene) {
     object *player1_har = omf_calloc(1, sizeof(object));
     object_create(player1_har, scene->gs, vec2i_create(160, 0), vec2f_create(0, 0));
     object_set_animation(player1_har, ani);
-    object_select_sprite(player1_har, player1->pilot->har_id);
+    object_select_sprite(player1_har, game_state_team_base_har(player1->pilot->har_id));
+    vs_set_custom_robot_preview(scene, player1_har, 0);
     object_set_halt(player1_har, 1);
     game_state_add_object(scene->gs, player1_har, RENDER_LAYER_MIDDLE, 0, 0);
 
@@ -572,6 +622,7 @@ int vs_create(scene *scene) {
         object_create(player2_har, scene->gs, vec2i_create(160, 0), vec2f_create(0, 0));
         object_set_animation(player2_har, ani);
         object_select_sprite(player2_har, player2->pilot->har_id);
+        vs_set_custom_robot_preview(scene, player2_har, 1);
         object_set_direction(player2_har, OBJECT_FACE_LEFT);
         object_set_pal_offset(player2_har, 48);
         object_set_pal_limit(player2_har, 96);
@@ -589,9 +640,10 @@ int vs_create(scene *scene) {
             object_set_animation(player1_portrait, create_animation_from_single(sp, vec2i_create(0, 0)));
             object_set_animation_owner(player1_portrait, OWNER_OBJECT);
             player1_portrait->cur_sprite_id = 0;
-        } else {
+        } else if(!vs_set_team_portrait(scene, player1_portrait, player1->pilot)) {
             object_set_animation(player1_portrait, ani);
-            object_select_sprite(player1_portrait, player1->pilot->pilot_id);
+            int pilot_id = player1->pilot->pilot_id;
+            object_select_sprite(player1_portrait, pilot_id <= PILOT_KREISSACK ? pilot_id : PILOT_CRYSTAL);
         }
         object_set_halt(player1_portrait, 1);
         game_state_add_object(scene->gs, player1_portrait, RENDER_LAYER_TOP, 0, 0);
@@ -605,9 +657,10 @@ int vs_create(scene *scene) {
             object_set_animation(player2_portrait, create_animation_from_single(sp, vec2i_create(0, 0)));
             object_set_animation_owner(player2_portrait, OWNER_OBJECT);
             player2_portrait->cur_sprite_id = 0;
-        } else {
+        } else if(!vs_set_team_portrait(scene, player2_portrait, player2->pilot)) {
             object_set_animation(player2_portrait, ani);
-            object_select_sprite(player2_portrait, player2->pilot->pilot_id);
+            int pilot_id = player2->pilot->pilot_id;
+            object_select_sprite(player2_portrait, pilot_id <= PILOT_KREISSACK ? pilot_id : PILOT_CRYSTAL);
         }
         object_set_direction(player2_portrait, OBJECT_FACE_LEFT);
         object_set_halt(player2_portrait, 1);
@@ -631,10 +684,11 @@ int vs_create(scene *scene) {
         local->report = create_report_card(fight_stats); // Set up the statistics texts to the right side of the scene
 
         // Let's add some scrapes
-        sprite *har_sprite = animation_get_sprite(player1_har->cur_animation, player1->pilot->har_id);
+        sprite *har_sprite = animation_get_sprite(player1_har->cur_animation, player1_har->cur_sprite_id);
         ani = &bk_get_info(scene->bk_data, 9)->ani;
 
-        int n_scrapes = ((fight_stats->max_hp - fight_stats->hp) * 170) / fight_stats->max_hp;
+        int n_scrapes = fight_stats->max_hp > 0 ?
+                           ((fight_stats->max_hp - fight_stats->hp) * 170) / fight_stats->max_hp : 0;
         log_debug("Creating %d scrapes", n_scrapes);
         int scrape_no;
         for(int n = 0; n < n_scrapes; n++) {
@@ -683,7 +737,7 @@ int vs_create(scene *scene) {
         // tournament mode
         local->insults[0] = NULL;
         local->insults[1] = create_insult_text(str_c(&player2->pilot->quotes[0]), 150, 60);
-    } else if(player2->pilot) {
+    } else if(player2->pilot && !scene->gs->team.active && player1->pilot->pilot_id <= PILOT_KREISSACK) {
         // 1 player
         local->insults[0] =
             create_insult_text(lang_get(749 + (11 * player1->pilot->pilot_id) + player2->pilot->pilot_id), 150, 30);
@@ -790,7 +844,8 @@ int vs_create(scene *scene) {
     local->too_pathetic_dialog.userdata = scene;
     local->too_pathetic_dialog.clicked = vs_too_pathetic_dialog_clicked;
 
-    if(player2->pilot && player2->pilot->pilot_id == PILOT_KREISSACK && settings_get()->gameplay.difficulty < 2) {
+    if(!scene->gs->team.arcade && player2->pilot && player2->pilot->pilot_id == PILOT_KREISSACK &&
+       settings_get()->gameplay.difficulty < 2) {
         // kreissack, but not on Veteran or higher
         dialog_show(&local->too_pathetic_dialog, 1);
     }

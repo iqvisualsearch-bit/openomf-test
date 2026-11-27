@@ -27,6 +27,8 @@
 
 #define IS_ZERO(n) (n < 0.8 && n > -0.8)
 
+static bool har_is_mech_gief(const object *obj, const har *fighter);
+static bool har_shoto_normal_confirmed(const object *obj, const har *fighter);
 void har_finished(object *obj);
 int har_act(object *obj, int act_type);
 void har_spawn_scrap(const object *obj, vec2i pos, int amount);
@@ -297,6 +299,8 @@ void har_set_ani(object *obj, int animation_id, int repeat) {
     obj->start = obj->pos;
     h->damage_done = 0;
     h->damage_received = 0;
+    h->hit_confirmed = false;
+    h->piledriver_from_normal = false;
     h->executing_move = 0;
 }
 
@@ -417,6 +421,15 @@ int har_is_blocking(object *obj, af_move *move) {
     return 0;
 }
 
+static bool har_can_grab_normal_hitstun(object *enemy, const har *attacker, const af_move *move) {
+    const har *target = object_get_userdata(enemy);
+    return move->id == MECH_GIEF_GRAB && attacker->piledriver_from_normal &&
+           target->state == STATE_RECOIL && target->health > 0 && !target->rehit_combo &&
+           !object_is_airborne(enemy) && enemy->cur_animation->id == ANIM_DAMAGE &&
+           enemy->cur_sprite_id >= 0 && enemy->cur_sprite_id < ('L' - 'A') &&
+           !player_frame_isset(enemy, TAG_ZZ) && !player_frame_isset(enemy, TAG_ZG);
+}
+
 bool is_in_range(object *obj, object *enemy_obj, af_move *move) {
     har *h = object_get_userdata(obj);
     af_move *check_move = move;
@@ -430,7 +443,12 @@ bool is_in_range(object *obj, object *enemy_obj, af_move *move) {
     if(check_move->successor_id) { // This is a throw with limited range
         // CLOSE moves use the successor id field as a distance requirement
         float throw_range = (float)obj->gs->match_settings.throw_range / 100.0f;
-        if(object_distance(obj, enemy_obj) > check_move->successor_id * throw_range) {
+        // Give the canceled grab room for the normal's initial pushback.
+        int reach = check_move->successor_id;
+        if(har_can_grab_normal_hitstun(enemy_obj, h, move)) {
+            reach += 14;
+        }
+        if(object_distance(obj, enemy_obj) > reach * throw_range) {
             return false;
         }
     }
@@ -621,9 +639,11 @@ void har_move(object *obj) {
             obj->vel.y = -6;
             h->air_stop = 0;
             har_set_ani(obj, ANIM_JUMPING, 0);
-            object_set_playback_direction(obj, PLAY_BACKWARDS);
-            object_set_tick_pos(obj, -110);
-            object_set_stride(obj, 7); // Pass 7 frames per tick
+            if(!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
+                object_set_playback_direction(obj, PLAY_BACKWARDS);
+                object_set_tick_pos(obj, -110);
+                object_set_stride(obj, 7); // Pass 7 frames per tick
+            }
         } else {
             object_set_halt(obj, 1);
             h->air_stop--;
@@ -704,9 +724,32 @@ void har_move(object *obj) {
             har_event_land(h, ctrl);
             har_floor_landing_effects(obj, true);
         } else if(h->state == STATE_JUMPING && enemy_har->is_grabbed == 0 && !player_frame_isset(obj, TAG_CG)) {
-            // Change animation from jump to walk or idle,
-            // depending on held inputs
-            if(last_input == '6') {
+            // A confirmed aerial normal can use a grounded special buffered just before landing.
+            const int landed_move = obj->cur_animation->id;
+            const bool grappler_confirm = h->hit_confirmed && h->executing_move && har_is_mech_gief(obj, h) &&
+                                           (landed_move == MECH_GIEF_BODY_PRESS || landed_move == MECH_GIEF_DROPKICK);
+            const bool shoto_confirm = af_get_move(h->af_data, SHOTO_PULSE_SHOT) && har_shoto_normal_confirmed(obj, h);
+            const bool air_confirm = grappler_confirm || shoto_confirm;
+            if(air_confirm && (h->punch_valid || h->kick_valid)) {
+                h->state = STATE_STANDING;
+                object_set_vel(obj, vec2f_create(0, 0));
+                if(har_act(obj, ACT_NONE)) {
+                    har_event_land(h, ctrl);
+                    har_floor_landing_effects(obj, true);
+                    return;
+                }
+                h->state = STATE_JUMPING;
+            }
+
+            // The custom jump has a short planted landing frame.
+            if(h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
+                h->state = STATE_STANDING;
+                object_set_vel(obj, vec2f_create(0, 0));
+                har_set_ani(obj, ANIM_JUMPING, 0);
+                object_set_custom_string(obj, "D6");
+                object_select_sprite(obj, 3);
+                h->executing_move = 1;
+            } else if(last_input == '6') {
                 h->state = STATE_WALKTO;
                 har_set_ani(obj, ANIM_WALKING, 1);
                 object_set_vel(obj, vec2f_create(0, 0));
@@ -976,9 +1019,9 @@ void har_take_damage(object *obj, af_move *move) {
         apply_stun_damage(obj, stun);
     }
 
-    // Handle health changes
+    // Refill before defeat processing so training keeps the normal hit reaction.
     if(h->health <= 0) {
-        h->health = 0;
+        h->health = obj->gs->team.training ? h->health_max : 0;
     }
 
     if(h->health == 0) {
@@ -998,9 +1041,23 @@ void har_take_damage(object *obj, af_move *move) {
 
     // chronos' stasis does not have a hit animation
     if(str_size(string) > 0) {
+        const bool launched = player_frame_isset(other_har, TAG_AI) && move->category != CAT_PROJECTILE;
+        int reaction_pose = MECH_GIEF_HIT_STANDING;
+        if(object_is_airborne(obj) || launched) {
+            reaction_pose = MECH_GIEF_HIT_AIRBORNE;
+        } else if(h->height == HEIGHT_CROUCHING || h->state == STATE_CROUCHBLOCK ||
+                  obj->cur_animation->id == ANIM_CROUCHING_BLOCK) {
+            reaction_pose = MECH_GIEF_HIT_CROUCHING;
+        }
+        animation *reaction = h->af_data->mech_gief_reactions[reaction_pose];
+        if(h->throw_duration) {
+            // Piledriver's victim script holds frame D before using the shared L/M knockdown frames.
+            reaction = move->next_move == MECH_GIEF_PILEDRIVER
+                           ? h->af_data->mech_gief_reactions[MECH_GIEF_HIT_STANDING]
+                           : NULL;
+        }
         h->state = STATE_RECOIL;
-        // Set hit animation
-        object_set_animation(obj, &af_get_move(h->af_data, ANIM_DAMAGE)->ani);
+        object_set_animation(obj, reaction ? reaction : &af_get_move(h->af_data, ANIM_DAMAGE)->ani);
         object_set_repeat(obj, 0);
         if(h->health <= 0) {
             controller *ctrl = game_player_get_ctrl(game_state_get_player(obj->gs, h->player_id));
@@ -1011,9 +1068,11 @@ void har_take_damage(object *obj, af_move *move) {
         if(h->throw_duration) {
             // No special handling
             object_set_stride(obj, 1);
-        } else if(player_frame_isset(other_har, TAG_AI) && (move->category != CAT_PROJECTILE)) {
+        } else if(launched) {
             log_debug("grounded launch");
-            str_from_c(&custom, "A1-s01l50B2-C2-L5-M400");
+            str_from_c(&custom, h->af_data->original_mech_gief_moves[MECH_GIEF_KNOCKDOWN_SLOT]
+                                    ? "Y1-s01l50B2-C2-L5-M400"
+                                    : "A1-s01l50B2-C2-L5-M400");
             obj->vel.x = -5.0 * object_get_direction(obj);
             obj->vel.y = -9.0;
             object_set_stride(obj, 1);
@@ -1176,6 +1235,14 @@ void har_spawn_scrap(const object *obj, vec2i pos, int amount) {
     }
 }
 
+static bool har_has_mech_gief_block(const object *obj, const har *h) {
+    if(obj->cur_animation->id == ANIM_STANDING_BLOCK) {
+        return h->af_data->original_mech_gief_moves[MECH_GIEF_STANDING_BLOCK_SLOT] != NULL;
+    }
+    return obj->cur_animation->id == ANIM_CROUCHING_BLOCK &&
+           h->af_data->original_mech_gief_moves[MECH_GIEF_CROUCH_BLOCK_SLOT] != NULL;
+}
+
 void har_block(object *obj, vec2i hit_coord, uint8_t block_stun) {
     har *h = obj->userdata;
     if(h->last_input == '1' || h->last_input == '3') {
@@ -1185,7 +1252,7 @@ void har_block(object *obj, vec2i hit_coord, uint8_t block_stun) {
     }
     // the HARs have a lame blank frame in their animation string, so use a custom one
 
-    object_set_custom_string(obj, "A1");
+    object_set_custom_string(obj, har_has_mech_gief_block(obj, h) && block_stun < 2 ? "B1" : "A1");
     object_set_repeat(obj, 0);
     object_dynamic_tick(obj);
     h->block_duration = block_stun;
@@ -1306,6 +1373,26 @@ void har_cornerpush(const object *self, object *enemy, const float distance) {
     }
 }
 
+// Scout reuses Jaguar's animation slots. Only Scout's arena fighter data
+// receives these changes, so a regular Jaguar can fight it in the same bout.
+enum {
+    SCOUT_TELEPORT = 20,
+    SCOUT_WIND_FRONTAL = 24,
+    SCOUT_DIVE_KICK = 43,
+};
+
+bool har_is_scout(const object *obj, const har *fighter) {
+    return game_state_selected_robot(obj->gs, fighter->player_id) == TEAM_HAR_SCOUT;
+}
+
+static bool har_is_mech_gief(const object *obj, const har *fighter) {
+    return game_state_selected_robot(obj->gs, fighter->player_id) == TEAM_HAR_MECH_GIEF;
+}
+
+static bool har_has_piledriver(const object *obj, const har *fighter) {
+    return har_is_mech_gief(obj, fighter) && af_get_move(fighter->af_data, MECH_GIEF_PILEDRIVER) != NULL;
+}
+
 // function to check if har A is hitting har B. Returns 1 if the har is executing a priority move which
 // would interrupt B. Currently only throws are considered priority.
 int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
@@ -1318,6 +1405,19 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
     // Check for collisions by sprite collision points
     af_move *move = af_get_move(a->af_data, obj_a->cur_animation->id);
 
+    if(har_has_piledriver(obj_a, a) && move->id == MECH_GIEF_GRAB &&
+       (obj_a->cur_sprite_id != 0 || object_is_airborne(obj_b) || b->is_grabbed || har_is_crouching(b))) {
+        return 0;
+    }
+    if(move->id == MECH_GIEF_HIP_TOSS && har_is_mech_gief(obj_a, a) &&
+       (obj_a->cur_sprite_id != 0 || object_is_airborne(obj_b) || b->is_grabbed || b->throw_duration)) {
+        return 0;
+    }
+    if(har_is_scout(obj_a, a) && move->id == SCOUT_TELEPORT &&
+       (b->state != STATE_STANDING || object_is_airborne(obj_b) || object_distance(obj_a, obj_b) > 32)) {
+        return 0;
+    }
+
     if(a->in_stasis_ticks) {
         // frozen HARs can't hit
         return 0;
@@ -1328,7 +1428,12 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
     }
 
     // Track this now so we don't re-evaluate after the hit registers
-    bool air_hit = object_is_airborne(obj_b) || player_frame_isset(obj_a, TAG_AI);
+    const bool target_airborne = object_is_airborne(obj_b);
+    const bool launches = player_frame_isset(obj_a, TAG_AI);
+    // Give a grounded Turning Elbow launch one follow-up under default rehit rules.
+    const bool elbow_opener = !target_airborne && move->id == MECH_GIEF_TURNING_ELBOW &&
+                              har_is_mech_gief(obj_a, a);
+    const bool air_hit = target_airborne || (launches && !elbow_opener);
 
     // if UH is set, bypass many of the collision bypass checks
     // TODO check these are the right ones
@@ -1356,8 +1461,9 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
             }
         }
 
-        // is the HAR invulnerable to this kind of attack?
-        if(har_is_invincible(obj_b, move)) {
+        // A hit-confirmed Piledriver can grab standing hitstun, while
+        // preserving throw protection and knockdown immunity.
+        if(har_is_invincible(obj_b, move) && !har_can_grab_normal_hitstun(obj_b, a, move)) {
             return 0;
         }
     }
@@ -1448,6 +1554,12 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
         object_set_direction(obj_b, -object_get_direction(obj_a));
         har_take_damage(obj_b, move);
 
+        if(move->id == MECH_GIEF_LARIAT && har_is_mech_gief(obj_a, a) && obj_a->q_val < 2 &&
+           !object_is_airborne(obj_b)) {
+            // Hold the first hit close enough for the next revolution.
+            obj_b->vel.x = -2.0f * object_get_direction(obj_b);
+        }
+
         if(b->rehit_combo) {
             obj_b->vel.y -= 3;
         }
@@ -1493,6 +1605,7 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
         }
 
         a->damage_done = 1;
+        a->hit_confirmed = true;
         b->damage_received = 1;
 
         // return if this move had priority
@@ -1504,6 +1617,12 @@ int har_collide_with_har(object *obj_a, object *obj_b, int loop) {
 
 void har_collide_with_projectile(object *o_har, object *o_pjt) {
     har *h = object_get_userdata(o_har);
+    // Check the lariat before block handling, even for projectiles
+    // whose move metadata uses a category other than CAT_PROJECTILE.
+    if(o_har->cur_animation->id == MECH_GIEF_LARIAT && har_is_mech_gief(o_har, h) &&
+       player_frame_isset(o_har, TAG_ZP)) {
+        return;
+    }
     const af *prog_owner_af_data = projectile_get_af_data(o_pjt);
     har *other = object_get_userdata(
         game_state_find_object(o_har->gs, game_state_get_player(o_har->gs, abs(h->player_id - 1))->har_obj_id));
@@ -1637,6 +1756,16 @@ void har_collide_with_projectile(object *o_har, object *o_pjt) {
         h->damage_received = 1;
         h->rehit_combo = air_hit;
         disable_rehit(h, move);
+
+        if(move->id == SHOTO_PULSE_ORB && game_state_selected_robot(o_pjt->gs, other->player_id) == TEAM_HAR_SHOTO) {
+            sound_opts impact;
+            sound_opts_init(&impact);
+            impact.volume = 68;
+            impact.panning = clamp((hit_coord.x - 160) * 100 / 160, -100, 100);
+            game_state_play_sound(o_har->gs, 1, &impact);
+            object_set_finished(o_pjt, true);
+            return;
+        }
 
         // Switch to successor animation if one exists for this projectile
         // CAT CLOSE is a check for shadow grab, but there's probably a special flag
@@ -1948,6 +2077,9 @@ void har_tick(object *obj) {
         if(h->throw_duration == 0) {
             // we've already called har_take_damage, so just apply the damage and check for defeat
             h->health -= h->last_damage_value;
+            if(obj->gs->team.training && h->health <= 0) {
+                h->health = h->health_max;
+            }
             // cannot combo from throw unless rehit mode is enabled
             h->rehit_combo = true;
             if(h->endurance < 0) {
@@ -2146,7 +2278,104 @@ static bool add_input(char *buf, int act_type, int direction) {
 }
 
 bool is_har_idle_air(object *obj) {
-    return (obj->cur_animation->id == ANIM_JUMPING) && game_state_hars_are_alive(obj->gs);
+    har *h = object_get_userdata(obj);
+    return obj->cur_animation->id == ANIM_JUMPING &&
+           (!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT] || object_is_airborne(obj)) && game_state_hars_are_alive(obj->gs);
+}
+
+static void scout_configure_specials(af *data) {
+    // Remove Jaguar's leap variants, overhead throw, cannon, and finishers
+    // from the selectable commands without disturbing shared animation references.
+    static const int inherited_specials[] = {15, 16, 17, 21, 25, 26, 28};
+    for(size_t i = 0; i < sizeof(inherited_specials) / sizeof(inherited_specials[0]); i++) {
+        af_move *move = af_get_move(data, inherited_specials[i]);
+        if(move) {
+            str_set_c(&move->move_string, "!");
+        }
+    }
+
+
+    af_move *teleport = af_get_move(data, SCOUT_TELEPORT);
+    if(teleport) {
+        str_set_c(&teleport->move_string, "P412");
+        // The teleport closes the distance before Jaguar's throw starts.
+        teleport->successor_id = 0;
+    }
+    af_move *wind = af_get_move(data, SCOUT_WIND_FRONTAL);
+    if(wind) {
+        str_set_c(&wind->move_string, "K632");
+        // Each pass through the kick frames opens one hit window.
+        str_set_c(&wind->ani.animation_string,
+                  "sp7sf-22l52s5A1-B2-cpq2C2-q2D2-q2E2-F1-"
+                  "sp7sf-22l52s5B1-cpq3C2-q3D2-q3E3-F3-G3-H3");
+    }
+    af_move *dive = af_get_move(data, SCOUT_DIVE_KICK);
+    if(dive) {
+        str_set_c(&dive->move_string, "K2");
+    }
+}
+
+static bool har_shoto_normal_confirmed(const object *obj, const har *fighter) {
+    if(!fighter->hit_confirmed || !fighter->executing_move ||
+       game_state_selected_robot(obj->gs, fighter->player_id) != TEAM_HAR_SHOTO) {
+        return false;
+    }
+    switch(obj->cur_animation->id) {
+        case 42: // Standing punch and kick
+        case 41:
+        case 30: // Down punch and kick
+        case 19:
+        case 17: // Forward punch and kick
+        case SHOTO_FORWARD_KICK:
+        case 23: // Down-forward punch and kick
+        case 18:
+        case 27: // Back punch and kick
+        case 24:
+        case 32: // Down-back punch and kick
+        case 33:
+        case 44: // Neutral airborne punch and kick
+        case 43:
+        case 15: // Forward airborne punch and kick
+        case SHOTO_FORWARD_AIR_KICK:
+        case SHOTO_BACK_AIR_PUNCH:
+        case SHOTO_BACK_AIR_KICK:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static bool har_can_cancel_mech_gief_normal(const object *obj, const har *h, int move_id) {
+    if(!h->hit_confirmed || !h->executing_move || object_is_airborne(obj)) {
+        return false;
+    }
+
+    // The replacement is installed only for Mech Gief, even though Nova shares these IDs.
+    int current = obj->cur_animation->id;
+    bool neutral_punch = current == MECH_GIEF_NEUTRAL_PUNCH && h->af_data->original_standing_attacks[0];
+    bool neutral_kick = current == MECH_GIEF_NEUTRAL_KICK && h->af_data->original_standing_attacks[1];
+    bool neutral = neutral_punch || neutral_kick;
+    const bool directional = current == MECH_GIEF_TURNING_ELBOW || current == MECH_GIEF_HIGH_KICK ||
+                             current == MECH_GIEF_LUNGING_PUNCH || current == MECH_GIEF_LONG_SIDE_KICK ||
+                             current == MECH_GIEF_HEEL_SWEEP || current == MECH_GIEF_LOW_UPPERCUT ||
+                             current == MECH_GIEF_HAMMERFIST || current == MECH_GIEF_HEEL_STOMP;
+    if(move_id == MECH_GIEF_FLAME_BURST || move_id == MECH_GIEF_GRAB || move_id == MECH_GIEF_LARIAT) {
+        if(!har_is_mech_gief(obj, h)) {
+            return false;
+        }
+        if((move_id == MECH_GIEF_FLAME_BURST && !h->af_data->mech_gief_flame_effect) ||
+           (move_id == MECH_GIEF_GRAB && !har_has_piledriver(obj, h))) {
+            return false;
+        }
+        return (neutral || directional || current == MECH_GIEF_CROUCH_PUNCH ||
+                             current == MECH_GIEF_CROUCH_KICK || current == MECH_GIEF_BODY_PRESS ||
+                             current == MECH_GIEF_DROPKICK);
+    }
+    return neutral &&
+           (move_id == MECH_GIEF_TURNING_ELBOW || move_id == MECH_GIEF_HIGH_KICK ||
+            move_id == MECH_GIEF_LUNGING_PUNCH || move_id == MECH_GIEF_LONG_SIDE_KICK ||
+            move_id == MECH_GIEF_HEEL_SWEEP || move_id == MECH_GIEF_LOW_UPPERCUT ||
+            move_id == MECH_GIEF_HAMMERFIST || move_id == MECH_GIEF_HEEL_STOMP);
 }
 
 bool is_move_chain_allowed(object *obj, af_move *move) {
@@ -2155,6 +2384,19 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
     bool allowed_in_idle = true;
     if(move->pos_constraints & POS_CANNOT_PERFORM) { // Not allowed to perform this move normally
         allowed_in_idle = false;
+    }
+
+    if(har_is_scout(obj, h)) {
+        if(str_equal_c(&move->move_string, "!")) {
+            return false;
+        }
+        if(move->id == SCOUT_DIVE_KICK && (!is_har_idle_air(obj) || h->air_attacked)) {
+            return false;
+        }
+        if((move->id == SCOUT_TELEPORT || move->id == SCOUT_WIND_FRONTAL) &&
+           (!is_har_idle_grounded(obj) || object_is_airborne(obj))) {
+            return false;
+        }
     }
 
     unsigned int len;
@@ -2172,7 +2414,10 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
 
     // check if the current frame allows chaining
     bool allowed = false;
-    if(player_frame_isset(obj, TAG_JN) && move->id == player_frame_get(obj, TAG_JN)) {
+    if((allowed_in_idle && har_can_cancel_mech_gief_normal(obj, h, move->id)) ||
+       (allowed_in_idle && move->id == SHOTO_PULSE_SHOT && !object_is_airborne(obj) &&
+        har_shoto_normal_confirmed(obj, h)) ||
+       (player_frame_isset(obj, TAG_JN) && move->id == player_frame_get(obj, TAG_JN))) {
         allowed = true;
     } else {
         switch(move->category) {
@@ -2184,9 +2429,25 @@ bool is_move_chain_allowed(object *obj, af_move *move) {
                 }
                 break;
             case CAT_CLOSE:
+                if(move->id == MECH_GIEF_GRAB && har_has_piledriver(obj, h)) {
+                    // Allow the attempt to whiff. Range is checked when it collides.
+                    allowed = allowed_in_idle && is_har_idle_grounded(obj) && !object_is_airborne(obj);
+                    break;
+                }
+                if(har_is_scout(obj, h) && move->id == SCOUT_TELEPORT) {
+                    allowed = allowed_in_idle && is_har_idle_grounded(obj);
+                    break;
+                }
                 if(player_frame_isset(obj, TAG_JG) || (is_har_idle_grounded(obj) && allowed_in_idle)) {
                     object *enemy_obj = game_state_find_object(
                         obj->gs, game_player_get_har_obj_id(game_state_get_player(obj->gs, !h->player_id)));
+                    const har *enemy = object_get_userdata(enemy_obj);
+                    if(move->id == MECH_GIEF_HIP_TOSS &&
+                       (object_is_airborne(enemy_obj) || enemy->throw_duration || enemy->is_grabbed ||
+                        enemy->state == STATE_STANDING_UP || enemy->state == STATE_WALLDAMAGE ||
+                        enemy->state >= STATE_VICTORY || enemy->rehit_combo)) {
+                        break;
+                    }
                     if(enemy_obj->pos.y == ARENA_FLOOR && !har_is_invincible(enemy_obj, move) &&
                        is_in_range(obj, enemy_obj, move)) {
                         allowed = true;
@@ -2241,11 +2502,36 @@ af_move *match_move_prefix(object *obj, char prefix, char *inputs) {
     af_move *move = NULL;
     size_t len;
 
-    for(int i = ANIM_SCREW + 1; i < 70; i++) {
-        if((move = af_get_move(h->af_data, i))) {
+    static const int scout_specials[] = {SCOUT_TELEPORT, SCOUT_WIND_FRONTAL, SCOUT_DIVE_KICK};
+    static const int mech_gief_specials[] = {MECH_GIEF_GRAB, MECH_GIEF_HIP_TOSS};
+    // Keep the inherited close throw ahead of the forward punch.
+    static const int shoto_priority_moves[] = {
+        SHOTO_PULSE_SHOT, 15, SHOTO_FORWARD_AIR_KICK, SHOTO_BACK_AIR_PUNCH, SHOTO_BACK_AIR_KICK,
+        20, 17, SHOTO_FORWARD_KICK,
+    };
+    const bool scout = har_is_scout(obj, h);
+    const bool shoto = game_state_selected_robot(obj->gs, h->player_id) == TEAM_HAR_SHOTO;
+    const int *priority_moves = scout ? scout_specials : (shoto ? shoto_priority_moves : mech_gief_specials);
+    const int special_count = scout ? (int)(sizeof(scout_specials) / sizeof(scout_specials[0])) :
+                              shoto ? (int)(sizeof(shoto_priority_moves) / sizeof(shoto_priority_moves[0])) :
+                              har_is_mech_gief(obj, h) ?
+                                  (int)(sizeof(mech_gief_specials) / sizeof(mech_gief_specials[0])) : 0;
+    // Give variant commands priority over stock moves with the same input.
+    for(int i = ANIM_SCREW + 1 - special_count; i < MAX_AF_MOVES; i++) {
+        int move_id = i <= ANIM_SCREW ? priority_moves[i - (ANIM_SCREW + 1 - special_count)] : i;
+        if((move = af_get_move(h->af_data, move_id))) {
             len = str_size(&move->move_string);
+            const bool forward_jump_attack = shoto && (move_id == 15 || move_id == SHOTO_FORWARD_AIR_KICK) &&
+                                             object_is_airborne(obj) &&
+                                             (inputs[0] == '6' || inputs[0] == '9' ||
+                                              (inputs[0] == '5' && obj->vel.x * object_get_direction(obj) > 0));
+            const bool back_jump_attack = shoto && (move_id == SHOTO_BACK_AIR_PUNCH || move_id == SHOTO_BACK_AIR_KICK) &&
+                                          object_is_airborne(obj) &&
+                                          (inputs[0] == '4' || inputs[0] == '7' ||
+                                           (inputs[0] == '5' && obj->vel.x * object_get_direction(obj) < 0));
             if((str_at(&move->move_string, 0) == prefix &&
-                (len == 1 || !strncmp(str_c(&move->move_string) + 1, inputs, len - 1))) ||
+                (forward_jump_attack || back_jump_attack || len == 1 ||
+                 !strncmp(str_c(&move->move_string) + 1, inputs, len - 1))) ||
                (game_state_get_player(obj->gs, h->player_id)->ez_destruct &&
                 (h->state == STATE_VICTORY || h->state == STATE_SCRAP))) {
                 if(is_move_chain_allowed(obj, move)) {
@@ -2387,7 +2673,10 @@ int har_act(object *obj, int act_type) {
     af_move *move = match_move(obj, truncated_inputs);
 
     if(player_frame_isset(obj, TAG_JN) && player_frame_isset(obj, TAG_CW) && (enemy_har->state == STATE_WALLDAMAGE)) {
-        move = af_get_move(h->af_data, player_frame_get(obj, TAG_JN));
+        af_move *followup = af_get_move(h->af_data, player_frame_get(obj, TAG_JN));
+        if(!har_is_scout(obj, h) || (followup && !str_equal_c(&followup->move_string, "!"))) {
+            move = followup;
+        }
     }
 
     if(move) {
@@ -2399,7 +2688,35 @@ int har_act(object *obj, int act_type) {
 
         // Set correct animation etc.
         // executing_move = 1 prevents new moves while old one is running.
+        if(har_is_scout(obj, h) && move->id == SCOUT_TELEPORT) {
+            float behind = enemy_obj->pos.x - object_get_direction(enemy_obj) * 30.0f;
+            obj->pos.x = clampf(behind, ARENA_LEFT_WALL, ARENA_RIGHT_WALL);
+            object_set_vel(obj, vec2f_create(0, 0));
+            har_face_enemy(obj, enemy_obj);
+        }
+        const bool piledriver_from_normal = move->id == MECH_GIEF_GRAB &&
+                                           har_can_cancel_mech_gief_normal(obj, h, move->id);
+        h->piledriver_from_normal = piledriver_from_normal;
+        if(piledriver_from_normal && har_can_grab_normal_hitstun(enemy_obj, h, move)) {
+            // Close a small gap from grounded hit pushback before the grab starts.
+            const float reach = (move->successor_id + 14) * (obj->gs->match_settings.throw_range / 100.0f);
+            const float gap = object_distance(obj, enemy_obj) - reach;
+            if(gap > -8 && gap <= 14) {
+                const int toward = enemy_obj->pos.x > obj->pos.x ? 1 : -1;
+                const float step = min2(gap + 8, 14);
+                obj->pos.x = clampf(obj->pos.x + step * toward, ARENA_LEFT_WALL, ARENA_RIGHT_WALL);
+            }
+        }
         har_set_ani(obj, move->id, 0);
+        h->piledriver_from_normal = piledriver_from_normal;
+        if(har_is_scout(obj, h)) {
+            if(move->id == SCOUT_WIND_FRONTAL) {
+                object_set_vel(obj, vec2f_create(9.0f * object_get_direction(obj), 0));
+            } else if(move->id == SCOUT_DIVE_KICK) {
+                object_set_vel(obj, vec2f_create(3.0f * object_get_direction(obj), 11.0f));
+                h->air_attacked = 1;
+            }
+        }
         // TODO the original will eventually discard inputs, but we don't understand how yet
         // so we simply do nothing for now
         // h->inputs[0] = '\0';
@@ -2503,8 +2820,15 @@ int har_act(object *obj, int act_type) {
                 object_set_vel(obj, vec2f_create(0, 0));
                 break;
             case STATE_STANDING:
-                har_set_ani(obj, ANIM_IDLE, 1);
-                object_set_stride(obj, h->stride);
+                if(h->af_data->original_mech_gief_moves[MECH_GIEF_CROUCH_SLOT] &&
+                   obj->cur_animation->id == ANIM_CROUCHING) {
+                    object_set_repeat(obj, 0);
+                    object_set_custom_string(obj, "D3");
+                    object_select_sprite(obj, 3);
+                } else {
+                    har_set_ani(obj, ANIM_IDLE, 1);
+                    object_set_stride(obj, h->stride);
+                }
                 object_set_vel(obj, vec2f_create(0, 0));
                 break;
             case STATE_WALKTO:
@@ -2524,18 +2848,22 @@ int har_act(object *obj, int act_type) {
                 int jump_dir = 0;
                 if(last_input == '9') {
                     vx = fixedpt_tofloat(h->fwd_speed) * direction;
-                    object_set_tick_pos(obj, 110);
-                    object_set_stride(obj, 7); // Pass 7 frames per tick
+                    if(!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
+                        object_set_tick_pos(obj, 110);
+                        object_set_stride(obj, 7); // Pass 7 frames per tick
+                    }
                     jump_dir = 1;
                 } else if(last_input == '7') {
                     // If we are jumping backwards, start animation from end
                     // at -100 frames (seems to be about right)
-                    object_set_playback_direction(obj, PLAY_BACKWARDS);
-                    object_set_tick_pos(obj, -110);
+                    if(!h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
+                        object_set_playback_direction(obj, PLAY_BACKWARDS);
+                        object_set_tick_pos(obj, -110);
+                        object_set_stride(obj, 7); // Pass 7 frames per tick
+                    }
                     vx = fixedpt_tofloat(h->back_speed) * direction * -1;
-                    object_set_stride(obj, 7); // Pass 7 frames per tick
                     jump_dir = -1;
-                } else if(last_input == '8') {
+                } else if(last_input == '8' && !h->af_data->original_mech_gief_moves[MECH_GIEF_JUMP_SLOT]) {
                     // If we are jumping upwards
                     object_set_tick_pos(obj, 110);
                     if(h->id == HAR_GARGOYLE) {
@@ -2587,7 +2915,11 @@ void har_finished(object *obj) {
     h->executing_move = 0;
 
     if(h->block_duration && (h->state == STATE_BLOCKSTUN || h->state == STATE_CROUCHBLOCK)) {
-        object_set_custom_string(obj, "A1");
+        const char *pose = "A1";
+        if(har_has_mech_gief_block(obj, h)) {
+            pose = h->block_duration == 1 && obj->cur_sprite_id == 1 ? "C1" : "B1";
+        }
+        object_set_custom_string(obj, pose);
         object_dynamic_tick(obj);
         h->block_duration--;
     } else if(h->state == STATE_SCRAP || h->state == STATE_DESTRUCTION) {
@@ -2609,7 +2941,11 @@ void har_finished(object *obj) {
     } else if(h->state == STATE_RECOIL && player_get_last_frame_letter(obj) == 'M') {
         har_event_recover(h, ctrl);
         h->state = STATE_STANDING_UP;
-        object_set_custom_string(obj, "zzO7-bj2zzO2");
+        if(h->af_data->original_mech_gief_moves[MECH_GIEF_GET_UP_SLOT]) {
+            har_set_ani(obj, ANIM_STANDUP, 0);
+        } else {
+            object_set_custom_string(obj, "zzO7-bj2zzO2");
+        }
     } else if((h->state == STATE_RECOIL || h->state == STATE_STANDING_UP) &&
               (h->endurance >= h->endurance_max || h->endurance < 0)) {
         if(h->state == STATE_RECOIL) {
@@ -2620,6 +2956,8 @@ void har_finished(object *obj) {
             // The more negative you go, the more time you're stunned.
             h->endurance = (((h->endurance_max - h->endurance) / 256) * 5 / 2 - 60) * 256;
         }
+        // A grounded dizzy fighter starts a fresh combo, even if a throw or juggle caused the stun.
+        clear_rehits(h);
         h->state = STATE_STUNNED;
         har_set_ani(obj, ANIM_STUNNED, 1);
         har_event_stun(h, ctrl);
@@ -2977,6 +3315,10 @@ int har_create(object *obj, af *af_data, int dir, int har_id, int pilot_id, int 
                 str_set_c(&move->move_string, "!");
             }
         }
+    }
+
+    if(har_is_scout(obj, local)) {
+        scout_configure_specials(af_data);
     }
 
     // All done

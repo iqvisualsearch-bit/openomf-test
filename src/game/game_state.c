@@ -714,6 +714,10 @@ int game_state_swap_scene(game_state *gs, int scene_id) {
     // Free texture items, we are going to create new ones.
     video_signal_scene_change();
 
+    gs->reload_scene = false;
+    if(scene_id == SCENE_MENU) {
+        gs->team = (team_battle){0};
+    }
     gs->this_id = scene_id;
     gs->next_id = scene_id;
 
@@ -961,7 +965,7 @@ void game_state_static_tick(game_state *gs, bool replay) {
     bool crossfade_out = settings_get()->video.crossfade_on && !scene_is_arena(gs->sc);
 
     // We want to load another scene
-    if(gs->this_id != gs->next_id && (gs->next_wait_ticks <= 1 || !crossfade_out)) {
+    if((gs->this_id != gs->next_id || gs->reload_scene) && (gs->next_wait_ticks <= 1 || !crossfade_out)) {
         // If this is the end, set run to 0 so that engine knows to close here
         if(gs->next_id == SCENE_NONE) {
             log_debug("Next ID is SCENE_NONE! bailing.");
@@ -1153,6 +1157,94 @@ void _setup_keyboard(game_state *gs, int player_id, int control_id) {
     // Set up player controller
     game_player_set_ctrl(player, ctrl);
     game_player_set_selectable(player, 1);
+}
+
+bool game_state_has_expanded_roster(const game_state *gs) {
+    return gs->team.active || gs->team.single_player;
+}
+
+int game_state_selected_robot(game_state *gs, int player) {
+    if(game_state_has_expanded_roster(gs) && gs->team.fighter[player] < TEAM_BATTLE_SIZE) {
+        return gs->team.roster[player][gs->team.fighter[player]];
+    }
+    return game_state_get_player(gs, player)->pilot->har_id;
+}
+
+int game_state_single_player_win_mask(int pilot, bool include_boss) {
+    const int regulars = (2 << PILOT_KREISSACK) - 2;
+    const int opponents = pilot < PILOT_KREISSACK ? regulars & ~(2 << pilot) : regulars;
+    return include_boss ? opponents | (2 << PILOT_KREISSACK) : opponents;
+}
+
+void game_state_pick_single_player_opponent(game_state *gs) {
+    game_player *player = game_state_get_player(gs, 0);
+    game_player *opponent = game_state_get_player(gs, 1);
+    int robot = HAR_NOVA;
+    if(player->sp_wins == game_state_single_player_win_mask(player->pilot->pilot_id, false)) {
+        opponent->pilot->pilot_id = PILOT_KREISSACK;
+    } else {
+        int pilot;
+        do {
+            pilot = rand_int(PILOT_KREISSACK);
+        } while(pilot == player->pilot->pilot_id || ((2u << pilot) & player->sp_wins));
+        opponent->pilot->pilot_id = pilot;
+        robot = rand_int(gs->team.single_player ? TEAM_HAR_SHOTO : HAR_NOVA);
+    }
+    gs->team.roster[1][0] = robot;
+    opponent->pilot->har_id = game_state_team_base_har(robot);
+}
+
+int game_state_team_base_har(int robot) {
+    if(robot == TEAM_HAR_MECH_GIEF) {
+        return HAR_NOVA;
+    }
+    return robot == TEAM_HAR_SCOUT || robot == TEAM_HAR_SHOTO ? HAR_JAGUAR : robot;
+}
+
+const char *game_state_team_har_name(int robot) {
+    if(robot == TEAM_HAR_MECH_GIEF) {
+        return "Grappler";
+    }
+    if(robot == TEAM_HAR_SHOTO) {
+        return "Shoto";
+    }
+    return robot == TEAM_HAR_SCOUT ? "Scout" : har_get_name(robot);
+}
+
+void game_state_start_team_arcade_stage(game_state *gs) {
+    static const struct {
+        int pilot_id;
+        uint8_t robots[TEAM_BATTLE_SIZE];
+        int arena;
+    } stages[TEAM_ARCADE_STAGES] = {
+        {PILOT_CRYSTAL, {HAR_JAGUAR, HAR_SHADOW, HAR_THORN}, 0},
+        {PILOT_MILANO, {HAR_PYROS, HAR_ELECTRA, TEAM_HAR_SCOUT}, 1},
+        {PILOT_SHIRRO, {HAR_SHREDDER, HAR_FLAIL, HAR_GARGOYLE}, 2},
+        {PILOT_RAVEN, {HAR_SHADOW, HAR_GARGOYLE, HAR_CHRONOS}, 3},
+        {PILOT_KREISSACK, {HAR_KATANA, HAR_CHRONOS, HAR_NOVA}, 0},
+    };
+
+    team_battle *team = &gs->team;
+    unsigned int stage = team->stage;
+    sd_pilot *cpu = game_state_get_player(gs, 1)->pilot;
+    pilot info;
+    pilot_get_info(&info, stages[stage].pilot_id);
+    cpu->pilot_id = stages[stage].pilot_id;
+    cpu->power = info.power;
+    cpu->agility = info.agility;
+    cpu->endurance_level = info.endurance_level;
+    cpu->sex = info.sex;
+    str_set_c(&cpu->name, lang_get(20 + cpu->pilot_id));
+    sd_pilot_set_player_color(cpu, PRIMARY, info.color_1);
+    sd_pilot_set_player_color(cpu, SECONDARY, info.color_2);
+    sd_pilot_set_player_color(cpu, TERTIARY, info.color_3);
+    memcpy(team->roster[1], stages[stage].robots, sizeof(team->roster[1]));
+    for(int i = 0; i < 2; i++) {
+        team->fighter[i] = 0;
+        team->health[i] = 0;
+        game_state_get_player(gs, i)->pilot->har_id = game_state_team_base_har(team->roster[i][0]);
+    }
+    gs->arena = stages[stage].arena;
 }
 
 void _setup_ai(game_state *gs, int player_id) {

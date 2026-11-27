@@ -9,6 +9,7 @@ typedef struct sprite_t {
     vec2i pos;
     surface *data;
     bool owned; // if we own the `data` surface
+    bool hit_all_opaque_pixels; // use the silhouette instead of reserved HAR palette indices
 } sprite;
 
 void sprite_create(sprite *sp, void *src, int id);

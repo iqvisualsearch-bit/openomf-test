@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "game/common_defines.h"
+#include "game/game_state.h"
 #include "game/gui/gui_frame.h"
 #include "game/gui/textinput.h"
 #include "game/scenes/scoreboard.h"
@@ -69,14 +70,16 @@ static void set_scores(scoreboard_local *local) {
             har_id = local->pending_data.har_id;
             pilot_id = local->pending_data.pilot_id;
             score_format(local->pending_data.score, score_text, sizeof(score_text));
-            snprintf(row, sizeof(row), SCORE_ROW_FMT, "", har_get_name(har_id), pilot_get_name(pilot_id), score_text);
+            snprintf(row, sizeof(row), SCORE_ROW_FMT, "", game_state_team_har_name(har_id),
+                         pilot_id < NUMBER_OF_PILOT_TYPES ? pilot_get_name(pilot_id) : "Guest", score_text);
         } else {
             har_id = local->data.entries[local->page][entry].har_id;
             pilot_id = local->data.entries[local->page][entry].pilot_id;
             player_name = local->data.entries[local->page][entry].name;
             if(score > 0) {
                 score_format(score, score_text, sizeof(score_text));
-                snprintf(row, sizeof(row), SCORE_ROW_FMT, player_name, har_get_name(har_id), pilot_get_name(pilot_id),
+                snprintf(row, sizeof(row), SCORE_ROW_FMT, player_name, game_state_team_har_name(har_id),
+                         pilot_id < NUMBER_OF_PILOT_TYPES ? pilot_get_name(pilot_id) : "Guest",
                          score_text);
             }
             entry++;
@@ -262,7 +265,7 @@ int scoreboard_create(scene *scene) {
         if(score_fits_scoreboard(local, score)) {
             local->has_pending_data = true;
             local->pending_data.score = score;
-            local->pending_data.har_id = player->pilot->har_id;
+            local->pending_data.har_id = game_state_selected_robot(scene->gs, 0);
             local->pending_data.pilot_id = player->pilot->pilot_id;
             local->pending_data.name[0] = 0;
         }

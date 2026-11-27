@@ -125,10 +125,13 @@ animation *create_animation_from_single(sprite *sp, vec2i pos) {
     vector_create_with_size(&a->collision_coords, sizeof(collision_coord), 0);
     vector_create_with_size(&a->extra_strings, sizeof(str), 0);
     vector_create_with_size(&a->sprites, sizeof(sprite_reference), 1);
-    sprite_reference spr;
-    spr.sprite = sp;
-    vector_append(&a->sprites, &spr);
+    animation_append_sprite(a, sp);
     return a;
+}
+
+void animation_append_sprite(animation *ani, sprite *sp) {
+    sprite_reference reference = {.sprite = sp};
+    vector_append(&ani->sprites, &reference);
 }
 
 int animation_clone(animation *src, animation *dst) {

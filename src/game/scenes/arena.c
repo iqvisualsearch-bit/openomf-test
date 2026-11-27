@@ -359,7 +359,8 @@ static void arena_end(scene *sc) {
         if(fight_stats->winner == 0) {
             int16_t hp_left_percent = har_health_percent(p1_har);
             // check if this is an unranked challenger with an enhancement we don't have
-            if(p2->pilot->rank == 0 && fight_stats->finish == FINISH_DESTRUCTION &&
+            if(p1->pilot->har_id < NUMBER_OF_HAR_TYPES && p2->pilot->rank == 0 &&
+               fight_stats->finish == FINISH_DESTRUCTION &&
                p2->pilot->enhancements[p1->pilot->har_id] == p1->pilot->enhancements[p1->pilot->har_id] + 1) {
                 p1->pilot->enhancements[p1->pilot->har_id] = p2->pilot->enhancements[p1->pilot->har_id];
                 fight_stats->plug_text = PLUG_ENHANCEMENT;
@@ -414,6 +415,41 @@ static void arena_end(scene *sc) {
             scene->gs->arena = 0;
         }
     }
+}
+
+static bool arena_advance_team(scene *scene, int winner) {
+    game_state *gs = scene->gs;
+    team_battle *team = &gs->team;
+    if(!team->active || team->training) {
+        return false;
+    }
+    if(gs->next_wait_ticks > 0) {
+        return true;
+    }
+
+    int loser = 1 - winner;
+    team->fighter[loser]++;
+    if(team->fighter[loser] == TEAM_BATTLE_SIZE) {
+        if(team->arcade && winner == 0 && team->stage + 1 < TEAM_ARCADE_STAGES) {
+            team->stage++;
+            game_state_start_team_arcade_stage(gs);
+            game_state_set_next(gs, SCENE_VS);
+        } else {
+            game_state_set_next(gs, SCENE_MENU);
+        }
+        return true;
+    }
+
+    game_player *winning_player = game_state_get_player(gs, winner);
+    object *winner_object = game_state_find_object(gs, game_player_get_har_obj_id(winning_player));
+    const har *winner_har = object_get_userdata(winner_object);
+    team->health[winner] = max2(1, winner_har->health);
+    team->health[loser] = 0;
+    game_state_get_player(gs, loser)->pilot->har_id =
+        game_state_team_base_har(team->roster[loser][team->fighter[loser]]);
+    game_state_set_next(gs, scene->id);
+    gs->reload_scene = true;
+    return true;
 }
 
 static void arena_create_roundstart_anim(scene *scene) {
@@ -743,7 +779,7 @@ void arena_har_defeat_hook(int loser_player_id, scene *scene) {
         }
         local->over = 1;
         local->winner = winner_player_id;
-        if(is_singleplayer(gs)) {
+        if(is_singleplayer(gs) && !gs->team.active) {
             player_winner->sp_wins |= 2 << player_loser->pilot->pilot_id;
             if(player_loser->pilot->pilot_id == PILOT_KREISSACK && player_loser->pilot->har_id == HAR_NOVA) {
                 har *loser_har = object_get_userdata(loser);
@@ -1341,7 +1377,9 @@ void arena_dynamic_tick(scene *scene, int paused) {
                 int progress = local->state_ticks - target_end_ticks;
                 if(progress >= ARENA_CROSSFADE_TICKS) {
                     if(local->over) {
-                        arena_end(scene);
+                        if(!arena_advance_team(scene, local->winner)) {
+                            arena_end(scene);
+                        }
                     } else {
                         local->round++;
                         arena_reset(scene);
@@ -1421,7 +1459,9 @@ void arena_input_tick(scene *scene) {
 
         ctrl_event *p1 = NULL, *p2 = NULL;
         controller_poll(player1->ctrl, &p1);
-        controller_poll(player2->ctrl, &p2);
+        if(!scene->gs->team.training) {
+            controller_poll(player2->ctrl, &p2);
+        }
 
         arena_handle_events(scene, player1, p1);
         arena_handle_events(scene, player2, p2);
@@ -1663,7 +1703,7 @@ static void arena_free(scene *scene) {
             sd_rec_finish(scene->gs->rec, scene->gs->tick);
         }
 
-        if(scene->gs->init_flags->record == 1) {
+        if(scene->gs->init_flags->record == 1 && !game_state_has_expanded_roster(scene->gs)) {
             // we're supposed to save it
             sd_rec_save(scene->gs->rec, &scene->gs->init_flags->rec_file);
         }
@@ -1732,6 +1772,9 @@ bool arena_secret_activated(const scene *scene) {
 }
 
 int arena_create(scene *scene) {
+    if(scene->gs->team.arcade) {
+        _setup_ai(scene->gs, 1);
+    }
     // Free up the script cache here, since we know that we don't share animations over the arena start.
     script_cache_clear();
 
@@ -1788,6 +1831,9 @@ int arena_create(scene *scene) {
             break;
     }
 
+    if(scene->gs->team.active) {
+        local->rounds = 1;
+    }
     local->tournament = false;
     local->over = 0;
     local->winner = 0;
@@ -1838,8 +1884,21 @@ int arena_create(scene *scene) {
         }
 
         object_create(obj, scene->gs, pos[i], vec2f_create(0, 0));
-        if(har_create(obj, scene->af_data[i], dir[i], player->pilot->har_id, player->pilot->pilot_id, i)) {
+        if(har_create(obj, scene->af_data[i], dir[i], game_state_team_base_har(player->pilot->har_id),
+                      player->pilot->pilot_id, i)) {
             return 1;
+        }
+
+        if(game_state_selected_robot(scene->gs, i) == TEAM_HAR_SCOUT) {
+            har *fighter = object_get_userdata(obj);
+            fighter->health_max = max2(1, fighter->health_max * 85 / 100);
+            fighter->health = fighter->health_max;
+            fighter->fwd_speed += fighter->fwd_speed / 5;
+            fighter->back_speed += fighter->back_speed / 5;
+        }
+        if(scene->gs->team.active && scene->gs->team.health[i] > 0) {
+            har *fighter = object_get_userdata(obj);
+            fighter->health = min2(fighter->health_max, scene->gs->team.health[i]);
         }
 
         // Enable HAR positional lighting if on Stadium arena (It's not used anywhere else).
@@ -1943,7 +2002,10 @@ int arena_create(scene *scene) {
     // Set the name and HAR here, as they will remain static during the match. Ping will be dynamically set.
     for(int i = 0; i < 2; i++) {
         local->player_name[i] = create_text_object(str_c(&_player[i]->pilot->name));
-        local->player_har[i] = create_text_object(lang_get(_player[i]->pilot->har_id + 31));
+        const int robot = game_state_selected_robot(scene->gs, i);
+        local->player_har[i] = create_text_object(
+            game_state_has_expanded_roster(scene->gs) || robot == HAR_GRAPPLER ?
+                game_state_team_har_name(robot) : lang_get(robot + 31));
         local->player_ping[i] = create_text_object("0");
     }
 

@@ -130,6 +130,8 @@ typedef struct har_t {
     const af *af_data;
     uint8_t damage_done;     // Damage was done this animation
     uint8_t damage_received; // Damage was received this animation
+    bool hit_confirmed;      // This attack landed without being blocked
+    bool piledriver_from_normal;
     uint8_t air_attacked;
     uint8_t is_wallhugging;    // HAR is standing right next to a wall
     uint8_t is_grabbed;        // Is being moved by another object. Set by ex, ey tags
@@ -200,6 +202,7 @@ typedef struct har_t {
 void har_install_action_hook(har *h, har_action_hook_cb hook, void *data);
 void har_install_hook(har *h, har_hook_cb hook, void *data);
 void har_bootstrap(object *obj);
+bool har_is_scout(const object *obj, const har *fighter);
 int har_create(object *obj, af *af_data, int dir, int har_id, int pilot_id, int player_id);
 void har_face_enemy(object *obj, object *obj_enemy);
 void har_set_ani(object *obj, int animation_id, int repeat);

@@ -55,7 +55,57 @@ typedef struct {
     bool sim;
 } match_settings;
 
+enum { TEAM_BATTLE_SIZE = 3, TEAM_ARCADE_STAGES = 5 };
+
+// Team roster entries can identify variants while the engine uses a base HAR ID.
+enum { TEAM_HAR_SCOUT = 11, TEAM_HAR_MECH_GIEF, TEAM_HAR_SHOTO, TEAM_HAR_COUNT };
+enum {
+    MECH_GIEF_LOW_UPPERCUT = 15,
+    MECH_GIEF_HEEL_STOMP = 17,
+    MECH_GIEF_CROUCH_KICK = 18,
+    MECH_GIEF_HEEL_SWEEP = 19,
+    MECH_GIEF_LARIAT = 20,
+    MECH_GIEF_LONG_SIDE_KICK = 21,
+    MECH_GIEF_HIGH_KICK = 23,
+    MECH_GIEF_GRAB = 24,
+    MECH_GIEF_FLAME_BURST = 31,
+    MECH_GIEF_HAMMERFIST = 32,
+    MECH_GIEF_TURNING_ELBOW = 33,
+    MECH_GIEF_CROUCH_PUNCH = 39,
+    MECH_GIEF_LUNGING_PUNCH = 41,
+    MECH_GIEF_NEUTRAL_KICK = 42,
+    MECH_GIEF_NEUTRAL_PUNCH = 43,
+    MECH_GIEF_DROPKICK = 44,
+    MECH_GIEF_BODY_PRESS = 45,
+    MECH_GIEF_HYDRAULIC_CRUSH = 50,
+    MECH_GIEF_PILEDRIVER = 60,
+    MECH_GIEF_HIP_TOSS = 61,
+    MECH_GIEF_HIP_TOSS_FOLLOWTHROUGH = 62,
+    SHOTO_PULSE_SHOT = 63,
+    SHOTO_PULSE_ORB = 64,
+    SHOTO_FORWARD_KICK = 65,
+    SHOTO_FORWARD_AIR_KICK = 66,
+    SHOTO_BACK_AIR_PUNCH = 67,
+    SHOTO_BACK_AIR_KICK = 68,
+    SHOTO_PULSE_BURN = 69,
+    SHOTO_PULSE_BURN_COLOR = 174, // Stable blue ramp entry in the stock arenas.
+};
+
+typedef struct {
+    bool active;
+    bool arcade;
+    bool training;
+    bool single_player;
+    unsigned int stage;
+    unsigned int picks;
+    uint8_t roster[2][TEAM_BATTLE_SIZE];
+    unsigned int fighter[2];
+    int16_t health[2];
+} team_battle;
+
 typedef struct game_state_t {
+    team_battle team;
+    bool reload_scene;
     unsigned int run;
     unsigned int paused;
     unsigned int this_id;

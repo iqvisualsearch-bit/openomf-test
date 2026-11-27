@@ -2,6 +2,7 @@
 #define HAR_ECONOMY_H
 
 #include "formats/pilot.h"
+#include "game/common_defines.h"
 
 enum HAR_UPGRADE
 {
@@ -14,15 +15,15 @@ enum HAR_UPGRADE
     N_UPGRADES,
 };
 
-static const uint8_t max_arm_speed[11] = {6, 8, 4, 6, 9, 7, 8, 6, 9, 6, 7};
-static const uint8_t max_leg_speed[11] = {8, 9, 5, 6, 8, 8, 7, 6, 7, 5, 6};
-static const uint8_t max_arm_power[11] = {5, 5, 9, 8, 4, 6, 6, 5, 5, 6, 7};
-static const uint8_t max_leg_power[11] = {6, 6, 8, 4, 5, 7, 5, 7, 6, 7, 7};
-static const uint8_t max_stun_res[11] = {8, 6, 8, 6, 7, 6, 6, 7, 7, 7, 6};
-static const uint8_t max_armor[11] = {5, 7, 7, 8, 6, 8, 6, 9, 6, 6, 7};
+static const uint8_t max_arm_speed[HAR_GRAPPLER + 1] = {6, 8, 4, 6, 9, 7, 8, 6, 9, 6, 7, [HAR_GRAPPLER] = 5};
+static const uint8_t max_leg_speed[HAR_GRAPPLER + 1] = {8, 9, 5, 6, 8, 8, 7, 6, 7, 5, 6, [HAR_GRAPPLER] = 4};
+static const uint8_t max_arm_power[HAR_GRAPPLER + 1] = {5, 5, 9, 8, 4, 6, 6, 5, 5, 6, 7, [HAR_GRAPPLER] = 9};
+static const uint8_t max_leg_power[HAR_GRAPPLER + 1] = {6, 6, 8, 4, 5, 7, 5, 7, 6, 7, 7, [HAR_GRAPPLER] = 6};
+static const uint8_t max_stun_res[HAR_GRAPPLER + 1] = {8, 6, 8, 6, 7, 6, 6, 7, 7, 7, 6, [HAR_GRAPPLER] = 8};
+static const uint8_t max_armor[HAR_GRAPPLER + 1] = {5, 7, 7, 8, 6, 8, 6, 9, 6, 6, 7, [HAR_GRAPPLER] = 8};
 
-static const int32_t har_prices[11] = {20000, 36000, 26000, 28000, 29000, 32000, 25000, 30000, 24000, 22000, 75000};
-static const int32_t har_upgrade_price[11] = {380, 400, 350, 400, 500, 330, 420, 370, 450, 360, 700};
+static const int32_t har_prices[HAR_GRAPPLER + 1] = {20000, 36000, 26000, 28000, 29000, 32000, 25000, 30000, 24000, 22000, 75000, [HAR_GRAPPLER] = 32000};
+static const int32_t har_upgrade_price[HAR_GRAPPLER + 1] = {380, 400, 350, 400, 500, 330, 420, 370, 450, 360, 700, [HAR_GRAPPLER] = 450};
 static const int32_t upgrade_level_multiplier[10] = {0, 1, 3, 7, 12, 18, 30, 50, 75, 120};
 
 static const int32_t arm_leg_multiplier = 2;

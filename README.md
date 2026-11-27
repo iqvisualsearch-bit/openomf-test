@@ -40,6 +40,34 @@ Installation
 2. Extract `OpenOMF.app` and try to open it
 3. If macOS blocks the app, open **System Settings > Privacy & Security**, scroll to the Security section, and click **Open Anyway**
 
+### Local Team Battle
+
+Choose **Team Battle** on the main menu. Each player selects one pilot and
+three distinct robots in the order they will fight. After each bout the
+losing side sends in its next robot at full health. The winning robot
+carries its remaining health into the next bout. The match ends when
+one side runs out of robots.
+
+### Team Arcade
+
+Choose **Team Arcade** on the main menu for a single-player campaign.
+Pick one pilot and three robots, then defeat five CPU teams, ending with
+Kreissack. A surviving robot carries its health within a stage. Your
+full lineup is restored at the start of the next stage.
+
+Both team modes offer Nova and Scout on the third row of robot selection.
+Scout uses Jaguar's visuals and basic attacks, with 20% faster ground
+movement and 15% less maximum health. Scout has three unique specials.
+
+Scout's specials use directions relative to the opponent:
+
+- **Teleport Slam** — quarter-circle back + Punch. Teleports behind the opponent and slams standing targets.
+- **Wind Frontal** — quarter-circle forward + Kick. Advances with two spinning kicks that can combo.
+- **Dive Kick** — Down + Kick while jumping.
+
+**Mech Gief** uses Spinning Piledriver with **quarter-circle forward + Punch**
+at close range. The grab can miss against crouching or airborne opponents.
+
 ### HD remaster artwork
 
 Desktop builds from this fork include the HD remaster in `mods/hd-remaster.zip`. The game loads the ZIP automatically when mod and PNG support are enabled. It replaces the intro logos, two versus portraits, four tournament player portraits, and the arena announcements and round numbers. To use it with an existing compatible OpenOMF installation, copy the ZIP into the game's `mods` directory alongside `resources` and leave it zipped.
